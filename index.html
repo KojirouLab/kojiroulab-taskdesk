@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608130700">
-<link rel="icon" href="icon-192.png?v=202608130700">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608130700">
+<link rel="manifest" href="manifest.json?v=202608130738">
+<link rel="icon" href="icon-192.png?v=202608130738">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608130738">
 <style>
   :root {
     --ink: #1C2321;
@@ -135,6 +135,7 @@
     letter-spacing: .05em;
   }
 
+  .rail-meta { display: contents; } /* デスクトップでは無害なラッパー。中身は.railの直接の子として並ぶ */
   .rail-stats { margin-top: auto; display: flex; gap: 6px; padding-top: 14px; border-top: 1px solid var(--line); }
   .rail-stats > div { flex: 1; background: var(--paper-raised); border: 1px solid var(--line); border-radius: 3px; padding: 8px 6px; text-align: center; }
   .rail-stats span { display: block; font-family: var(--font-mono); font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -391,7 +392,13 @@
     .rail-nav { flex-direction: row; }
     .nav-text { display: none; }
     .nav-loop { display: none; }
+    .rail-meta {
+      display: flex; flex-direction: column; gap: 4px; margin-left: 10px; padding-left: 10px;
+      border-left: 1px solid var(--line); flex-shrink: 0; width: 132px;
+    }
     .rail-stats { margin-top: 0; border-top: none; padding-top: 0; }
+    .notify-status, .sync-status { border-top: none; padding-top: 0; font-size: 10px; }
+    .sync-connect-form { flex-direction: column; }
     main { padding: 22px 18px 50px; }
     .matrix, .board, .focus-wrap, .report-grid, .history-grid { grid-template-columns: 1fr; }
     .cal-cell { min-height: 64px; }
@@ -410,12 +417,14 @@
       <div class="brand-sub">GTD・マトリクス・カレンダー<br>カンバン・ポモドーロ・週報 を一つの卓上に</div>
     </div>
     <nav class="rail-nav" id="railNav"></nav>
-    <div class="sync-status" id="syncStatus"></div>
-    <div class="notify-status" id="notifyStatus"></div>
-    <div class="rail-stats">
-      <div><span id="statTotal">0</span><label>総チケット</label></div>
-      <div><span id="statDone">0</span><label>完了</label></div>
-      <div><span id="statPomo">0</span><label>本日集中</label></div>
+    <div class="rail-meta">
+      <div class="sync-status" id="syncStatus"></div>
+      <div class="notify-status" id="notifyStatus"></div>
+      <div class="rail-stats">
+        <div><span id="statTotal">0</span><label>総チケット</label></div>
+        <div><span id="statDone">0</span><label>完了</label></div>
+        <div><span id="statPomo">0</span><label>本日集中</label></div>
+      </div>
     </div>
   </aside>
   <main id="main"></main>
@@ -888,6 +897,14 @@
     return id;
   }
   var syncState = { status: "idle", lastSyncedAt: null, formOpen: false }; // idle | busy | ok | err | offline
+  // 同期するのは実データのみ。activeView/calCursor/timerは端末ごとのローカルなUI状態なので
+  // 同期対象から外す(混ぜると、他端末の「今どの画面を見ていたか」で表示が勝手に切り替わってしまう)。
+  var SYNC_FIELDS = ["tasks", "reviews", "pomodoroLog", "counter", "timerSettings", "updatedAt"];
+  function syncPayload() {
+    var payload = {};
+    SYNC_FIELDS.forEach(function (k) { payload[k] = state[k]; });
+    return payload;
+  }
 
   function supabaseHeaders() {
     return {
@@ -908,9 +925,9 @@
       syncState.status = "ok"; syncState.lastSyncedAt = Date.now();
       if (rows && rows[0] && rows[0].data && (force || rows[0].data.updatedAt > state.updatedAt)) {
         // force=true(=接続直後)は、タイムスタンプの新旧に関わらず相手のデータを必ず採用する。
+        // SYNC_FIELDSだけ取り込む(activeViewなどローカルなUI状態は上書きしない)。
         var incoming = rows[0].data;
-        Object.keys(incoming).forEach(function (k) { state[k] = incoming[k]; });
-        if (state.timer) state.timer.running = false;
+        SYNC_FIELDS.forEach(function (k) { if (k in incoming) state[k] = incoming[k]; });
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         render();
       } else if (force && (!rows || !rows[0])) {
@@ -933,7 +950,7 @@
     return fetch(SUPABASE_URL + "/rest/v1/taskdesk_state?on_conflict=id", {
       method: "POST",
       headers: Object.assign(supabaseHeaders(), { "Prefer": "resolution=merge-duplicates" }),
-      body: JSON.stringify([{ id: id, data: state, updated_at: new Date().toISOString() }])
+      body: JSON.stringify([{ id: id, data: syncPayload(), updated_at: new Date().toISOString() }])
     }).then(function (res) {
       if (!res.ok) throw new Error("push failed: " + res.status);
       syncState.status = "ok"; syncState.lastSyncedAt = Date.now();
@@ -1443,7 +1460,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608130700").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608130738").catch(function () {});
     });
   }
 </script>
