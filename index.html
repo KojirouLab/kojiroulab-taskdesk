@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608130738">
-<link rel="icon" href="icon-192.png?v=202608130738">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608130738">
+<link rel="manifest" href="manifest.json?v=202608130756">
+<link rel="icon" href="icon-192.png?v=202608130756">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608130756">
 <style>
   :root {
     --ink: #1C2321;
@@ -283,6 +283,11 @@
   }
   .move-btn:hover:not(:disabled) { background: var(--paper-sunken); color: var(--ink); }
   .move-btn:disabled { opacity: .3; cursor: default; }
+  @media (pointer: coarse) {
+    /* 指でのタップが主な端末では、Appleのガイドライン(最小44pt)に近づけて当たり判定を広げる */
+    .move-btn { width: 38px; height: 38px; font-size: 17px; }
+    .btn-ghost { padding: 9px 11px; }
+  }
   .pomo-dots { font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; color: var(--amber); }
 
   /* ---------- Calendar ---------- */
@@ -435,6 +440,10 @@
 (function () {
   "use strict";
 
+  // タッチ端末ではHTML5ドラッグ&ドロップがそもそも動作せず、かつ draggable="true" な要素の中の
+  // ボタンはiOS Safariでタップが取りこぼされることがあるため、タッチ端末ではdraggableを付けない
+  // (移動は矢印ボタンのみに一本化する)。
+  var IS_TOUCH = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
   var STORAGE_KEY = "taskdesk.v1";
   var SYNC_ID_KEY = "taskdesk.syncId";
 
@@ -1202,7 +1211,7 @@
       { id: "done", title: "完了" }
     ];
     var triaged = state.tasks.filter(function (t) { return t.triaged; });
-    var html = viewHead("04 · KANBAN", "ボード", "看板方式でチケットの状態を可視化する。カードは矢印ボタンかドラッグで隣の列へ動かせる。");
+    var html = viewHead("04 · KANBAN", "ボード", "看板方式でチケットの状態を可視化する。カードは" + (IS_TOUCH ? "矢印ボタンで" : "矢印ボタンかドラッグで") + "隣の列へ動かせる。");
     html += '<div class="board">';
     cols.forEach(function (col, ci) {
       var items = triaged.filter(function (t) { return t.status === col.id; });
@@ -1213,7 +1222,7 @@
       } else {
         items.forEach(function (t) {
           var meta = QUAD_META[quadrantOf(t)];
-          html += '<div class="ticket status-' + t.status + '" draggable="true" data-drag="' + t.id + '">' +
+          html += '<div class="ticket status-' + t.status + '"' + (IS_TOUCH ? "" : ' draggable="true"') + ' data-drag="' + t.id + '">' +
             '<div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' +
             '<span class="pill ' + meta.cls + '">' + meta.title + '</span>' + repeatPillHtml(t) + '</div>' +
             '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
@@ -1460,7 +1469,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608130738").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608130756").catch(function () {});
     });
   }
 </script>
