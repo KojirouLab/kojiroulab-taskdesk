@@ -4,16 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>タスクデスク</title>
-<meta name="description" content="GTD・アイゼンハワーマトリクス・カレンダー・カンバン・ポモドーロ・PDCAを1つの卓上に統合したタスク管理アプリ">
+<meta name="description" content="GTD・アイゼンハワーマトリクス・カレンダー・カンバン・ポモドーロ・週次報告書を1つの卓上に統合したタスク管理アプリ">
 <meta name="theme-color" content="#ECE8DD">
 <meta name="theme-color" content="#17191A" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608122306">
-<link rel="icon" href="icon-192.png?v=202608122306">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608122306">
+<link rel="manifest" href="manifest.json?v=202608130537">
+<link rel="icon" href="icon-192.png?v=202608130537">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608130537">
 <style>
   :root {
     --ink: #1C2321;
@@ -216,7 +216,7 @@
     box-shadow: 0 1px 2px var(--shadow);
   }
   .ticket-head {
-    display: flex; align-items: center; gap: 8px; padding-bottom: 9px; margin-bottom: 9px;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-bottom: 9px; margin-bottom: 9px;
     border-bottom: 1px dashed var(--line);
   }
   .ticket-no { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); letter-spacing: .03em; }
@@ -355,29 +355,33 @@
   .tally-row { font-family: var(--font-mono); font-size: 20px; letter-spacing: .1em; color: var(--amber); word-break: break-all; }
   .tally-row .off { color: var(--line); }
 
-  /* ---------- Review / PDCA ---------- */
+  /* ---------- Review / Weekly report ---------- */
   .week-bar { display: flex; align-items: baseline; gap: 10px; margin-bottom: 16px; }
   .week-range { font-family: var(--font-mono); font-size: 13px; color: var(--ink-soft); }
   .stat-chips { display: flex; gap: 8px; margin-bottom: 20px; }
   .stat-chip { background: var(--accent-soft); color: var(--accent-ink); border-radius: 3px; padding: 5px 11px; font-size: 12px; font-weight: 600; }
-  .pdca-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 30px; }
-  .pdca-cell { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 5px; padding: 14px; }
-  .pdca-cell.p { border-top: 3px solid var(--info); }
-  .pdca-cell.d { border-top: 3px solid var(--amber); }
-  .pdca-cell.c { border-top: 3px solid var(--warn); }
-  .pdca-cell.a { border-top: 3px solid var(--good); }
-  .pdca-label { display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px; }
-  .pdca-letter { font-family: var(--font-mono); font-weight: 700; font-size: 13px; }
-  .pdca-name { font-size: 12.5px; font-weight: 700; }
-  .pdca-cell textarea {
+  .report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 30px; }
+  .report-cell { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 5px; padding: 14px; }
+  .report-cell.r1 { border-top: 3px solid var(--good); }
+  .report-cell.r2 { border-top: 3px solid var(--accent); }
+  .report-cell.r3 { border-top: 3px solid var(--warn); }
+  .report-cell.r4 { border-top: 3px solid var(--ink-faint); }
+  .report-cell.r5 { border-top: 3px solid var(--amber); }
+  .report-cell.r6 { border-top: 3px solid var(--info); }
+  .report-label { display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px; }
+  .report-num { font-family: var(--font-mono); font-weight: 700; font-size: 13px; color: var(--ink-faint); }
+  .report-name { font-size: 12.5px; font-weight: 700; }
+  .report-cell textarea {
     width: 100%; min-height: 72px; resize: vertical; background: var(--paper); border: 1px solid var(--line);
     border-radius: 3px; padding: 9px 10px; line-height: 1.55; font-size: 13px;
   }
   .history-title { font-size: 12px; font-weight: 700; color: var(--ink-soft); letter-spacing: .04em; margin-bottom: 10px; text-transform: uppercase; }
   .history-item { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 5px; padding: 12px 14px; margin-bottom: 8px; }
   .history-week { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-soft); margin-bottom: 6px; }
-  .history-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; font-size: 12px; }
+  .history-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 12px; }
   .history-grid strong { display: block; font-size: 10.5px; color: var(--ink-faint); margin-bottom: 2px; }
+
+  .pill-repeat { background: var(--accent-soft); color: var(--accent-ink); }
 
   /* ---------- Responsive ---------- */
   @media (max-width: 860px) {
@@ -389,7 +393,7 @@
     .nav-loop { display: none; }
     .rail-stats { margin-top: 0; border-top: none; padding-top: 0; }
     main { padding: 22px 18px 50px; }
-    .matrix, .board, .focus-wrap, .pdca-grid { grid-template-columns: 1fr; }
+    .matrix, .board, .focus-wrap, .report-grid, .history-grid { grid-template-columns: 1fr; }
     .cal-cell { min-height: 64px; }
     .cal-chip { font-size: 9.5px; }
   }
@@ -403,7 +407,7 @@
     <div class="brand">
       <div class="brand-mark">TASK DESK</div>
       <div class="brand-title">タスクデスク</div>
-      <div class="brand-sub">GTD・マトリクス・カレンダー<br>カンバン・ポモドーロ・PDCA を一つの卓上に</div>
+      <div class="brand-sub">GTD・マトリクス・カレンダー<br>カンバン・ポモドーロ・週報 を一つの卓上に</div>
     </div>
     <nav class="rail-nav" id="railNav"></nav>
     <div class="sync-status" id="syncStatus"></div>
@@ -436,7 +440,7 @@
     { id: "calendar", num: "03", jp: "カレンダー", en: "CALENDAR" },
     { id: "board",    num: "04", jp: "ボード",     en: "BOARD"    },
     { id: "focus",    num: "05", jp: "集中",       en: "FOCUS"    },
-    { id: "review",   num: "06", jp: "振り返り",   en: "REVIEW"   }
+    { id: "review",   num: "06", jp: "週報",       en: "REPORT"   }
   ];
 
   var todayKey = function (d) {
@@ -482,12 +486,12 @@
       activeView: "inbox",
       calCursor: { year: new Date().getFullYear(), month: new Date().getMonth() },
       tasks: [
-        { id: 1, no: "No.001", title: "牡蠣の積み込みプランを来週分アップデート", note: "女川発/仙台発ルートの順番を再確認する", createdAt: now - day * 3, triaged: true, urgent: true, important: true, status: "doing", estPomodoros: 3, donePomodoros: 2, completedAt: null, dueDate: todayKey(new Date(now + day)), dueTime: "17:00", reminderMin: 30, notifiedAt: null },
-        { id: 2, no: "No.002", title: "タスクカレンダーのGoogle連携 Phase2を設計", note: "Phase1完了分の反省を踏まえて構成を練る", createdAt: now - day * 2, triaged: true, urgent: false, important: true, status: "todo", estPomodoros: 4, donePomodoros: 0, completedAt: null, dueDate: todayKey(new Date(now + day * 10)), dueTime: null, reminderMin: null, notifiedAt: null },
-        { id: 3, no: "No.003", title: "経費精算をまとめて提出する", note: "", createdAt: now - day * 4, triaged: true, urgent: true, important: false, status: "todo", estPomodoros: 1, donePomodoros: 0, completedAt: null, dueDate: todayKey(new Date(now + day * 2)), dueTime: "12:00", reminderMin: 60, notifiedAt: null },
-        { id: 4, no: "No.004", title: "使っていないSupabaseプロジェクトを整理", note: "検証用に作った古いものが残っている", createdAt: now - day * 6, triaged: true, urgent: false, important: false, status: "todo", estPomodoros: 1, donePomodoros: 0, completedAt: null, dueDate: null, dueTime: null, reminderMin: null, notifiedAt: null },
-        { id: 5, no: "No.005", title: "受発注システムのLINE通知の文言を最終確認", note: "締切リマインドの言い回しが硬すぎないか見直す", createdAt: now - day, triaged: false, urgent: null, important: null, status: "todo", estPomodoros: 2, donePomodoros: 0, completedAt: null, dueDate: null, dueTime: null, reminderMin: null, notifiedAt: null },
-        { id: 6, no: "No.006", title: "月次の在庫棚卸チェックリストを更新", note: "牡蠣の在庫管理フローに合わせて項目を見直す", createdAt: now - day * 5, triaged: true, urgent: true, important: false, status: "doing", estPomodoros: 1, donePomodoros: 0, completedAt: null, dueDate: todayKey(new Date(now - day * 2)), dueTime: null, reminderMin: null, notifiedAt: null }
+        { id: 1, no: "No.001", title: "牡蠣の積み込みプランを来週分アップデート", note: "女川発/仙台発ルートの順番を再確認する", createdAt: now - day * 3, triaged: true, urgent: true, important: true, status: "doing", estPomodoros: 3, donePomodoros: 2, completedAt: null, dueDate: todayKey(new Date(now + day)), dueTime: "17:00", reminderMin: 30, notifiedAt: null, repeat: null },
+        { id: 2, no: "No.002", title: "タスクカレンダーのGoogle連携 Phase2を設計", note: "Phase1完了分の反省を踏まえて構成を練る", createdAt: now - day * 2, triaged: true, urgent: false, important: true, status: "todo", estPomodoros: 4, donePomodoros: 0, completedAt: null, dueDate: todayKey(new Date(now + day * 10)), dueTime: null, reminderMin: null, notifiedAt: null, repeat: null },
+        { id: 3, no: "No.003", title: "経費精算をまとめて提出する", note: "", createdAt: now - day * 4, triaged: true, urgent: true, important: false, status: "todo", estPomodoros: 1, donePomodoros: 0, completedAt: null, dueDate: todayKey(new Date(now + day * 2)), dueTime: "12:00", reminderMin: 60, notifiedAt: null, repeat: "weekly" },
+        { id: 4, no: "No.004", title: "使っていないSupabaseプロジェクトを整理", note: "検証用に作った古いものが残っている", createdAt: now - day * 6, triaged: true, urgent: false, important: false, status: "todo", estPomodoros: 1, donePomodoros: 0, completedAt: null, dueDate: null, dueTime: null, reminderMin: null, notifiedAt: null, repeat: null },
+        { id: 5, no: "No.005", title: "受発注システムのLINE通知の文言を最終確認", note: "締切リマインドの言い回しが硬すぎないか見直す", createdAt: now - day, triaged: false, urgent: null, important: null, status: "todo", estPomodoros: 2, donePomodoros: 0, completedAt: null, dueDate: null, dueTime: null, reminderMin: null, notifiedAt: null, repeat: null },
+        { id: 6, no: "No.006", title: "月次の在庫棚卸チェックリストを更新", note: "牡蠣の在庫管理フローに合わせて項目を見直す", createdAt: now - day * 5, triaged: true, urgent: true, important: false, status: "doing", estPomodoros: 1, donePomodoros: 0, completedAt: null, dueDate: todayKey(new Date(now - day * 2)), dueTime: null, reminderMin: null, notifiedAt: null, repeat: "daily" }
       ],
       pomodoroLog: [
         { date: todayKey(new Date(now - day)), taskId: 1 },
@@ -514,6 +518,13 @@
         if (!("dueTime" in t)) t.dueTime = null;
         if (!("reminderMin" in t)) t.reminderMin = null;
         if (!("notifiedAt" in t)) t.notifiedAt = null;
+        if (!("repeat" in t)) t.repeat = null;
+      });
+      Object.keys(parsed.reviews || {}).forEach(function (k) {
+        var r = parsed.reviews[k];
+        ["wentWell", "luckyWell", "needsImprovement", "shouldStop", "toDiscuss", "nextWeek"].forEach(function (f) {
+          if (!(f in r)) r[f] = "";
+        });
       });
       return parsed;
     } catch (e) { return seedState(); }
@@ -530,21 +541,34 @@
     });
   }
 
-  /* ---------------- ISO week helpers ---------------- */
+  /* ---------------- Week helpers (木曜始まり〜水曜終わり) ---------------- */
+  function weekRangeFmt(dt) { return (dt.getMonth() + 1) + "/" + dt.getDate(); }
   function weekInfo(date) {
-    var d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    var dayNum = (d.getUTCDay() + 6) % 7;
-    d.setUTCDate(d.getUTCDate() - dayNum + 3);
-    var firstThursday = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
-    var week = 1 + Math.round(((d - firstThursday) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
-    var monday = new Date(date); monday.setDate(date.getDate() - ((date.getDay() + 6) % 7));
-    var sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
-    var fmt = function (dt) { return (dt.getMonth() + 1) + "/" + dt.getDate(); };
-    return { key: d.getUTCFullYear() + "-W" + pad(week), range: fmt(monday) + "〜" + fmt(sunday), start: monday, end: sunday };
+    var dow = date.getDay(); // 0=Sun..6=Sat
+    var diffToThu = (dow - 4 + 7) % 7; // Thu=4
+    var thu = new Date(date.getFullYear(), date.getMonth(), date.getDate() - diffToThu);
+    var wed = new Date(thu.getFullYear(), thu.getMonth(), thu.getDate() + 6);
+    return { key: todayKey(thu), range: weekRangeFmt(thu) + "〜" + weekRangeFmt(wed), start: thu, end: wed };
+  }
+  function formatWeekRangeFromKey(key) {
+    var p = key.split("-").map(Number);
+    var thu = new Date(p[0], p[1] - 1, p[2]);
+    var wed = new Date(thu.getFullYear(), thu.getMonth(), thu.getDate() + 6);
+    return weekRangeFmt(thu) + "〜" + weekRangeFmt(wed);
   }
 
+  var REPORT_FIELDS = [
+    { k: "wentWell", num: "①", cls: "r1", name: "今週うまく行ったこと", ph: "意図して取り組み、成果が出たことは？" },
+    { k: "luckyWell", num: "②", cls: "r2", name: "今たまたまうまく行ったこと", ph: "狙っていなかったが、結果的に良かったことは？" },
+    { k: "needsImprovement", num: "③", cls: "r3", name: "うまくいかず改善が必要なこと", ph: "計画通りに進まなかったことは？" },
+    { k: "shouldStop", num: "④", cls: "r4", name: "停止すべきこと", ph: "やめる・減らすべきことは？" },
+    { k: "toDiscuss", num: "⑤", cls: "r5", name: "相談したいこと", ph: "判断に迷っている、助けが欲しいことは？" },
+    { k: "nextWeek", num: "⑥", cls: "r6", name: "来週やること", ph: "来週の予定・目標は？" }
+  ];
   function getReview(key) {
-    if (!state.reviews[key]) state.reviews[key] = { plan: "", "do": "", check: "", act: "" };
+    if (!state.reviews[key]) {
+      state.reviews[key] = { wentWell: "", luckyWell: "", needsImprovement: "", shouldStop: "", toDiscuss: "", nextWeek: "" };
+    }
     return state.reviews[key];
   }
 
@@ -557,7 +581,7 @@
       id: state.counter, no: "No." + String(state.counter).padStart(3, "0"),
       title: title, note: "", createdAt: Date.now(), triaged: false,
       urgent: null, important: null, status: "todo", estPomodoros: 2, donePomodoros: 0, completedAt: null,
-      dueDate: null, dueTime: null, reminderMin: null, notifiedAt: null
+      dueDate: null, dueTime: null, reminderMin: null, notifiedAt: null, repeat: null
     });
     save(); render();
   }
@@ -585,15 +609,41 @@
     var t = findTask(id); if (!t) return;
     var idx = STATUS_ORDER.indexOf(t.status) + dir;
     if (idx < 0 || idx >= STATUS_ORDER.length) return;
-    t.status = STATUS_ORDER[idx];
-    t.completedAt = t.status === "done" ? Date.now() : null;
+    var newStatus = STATUS_ORDER[idx];
+    var becameDone = newStatus === "done" && t.status !== "done";
+    t.status = newStatus;
+    t.completedAt = newStatus === "done" ? Date.now() : null;
+    if (becameDone && t.repeat) spawnRecurrence(t);
     save(); render();
   }
   function setStatus(id, status) {
     var t = findTask(id); if (!t) return;
+    var becameDone = status === "done" && t.status !== "done";
     t.status = status;
     t.completedAt = status === "done" ? Date.now() : null;
+    if (becameDone && t.repeat) spawnRecurrence(t);
     save(); render();
+  }
+  function setRepeat(id, value) {
+    var t = findTask(id); if (!t) return;
+    t.repeat = value || null;
+    save(); render();
+  }
+  // 繰り返しタスクが完了した時、次回分のチケットを新規発行する。
+  // 起点は「完了した日」ではなく元の期限日(なければ今日)。毎週は+7日、毎日は+1日。
+  function spawnRecurrence(t) {
+    state.counter += 1;
+    var base = t.dueDate ? new Date(t.dueDate + "T00:00:00") : new Date();
+    var offsetDays = t.repeat === "daily" ? 1 : 7;
+    var next = new Date(base.getFullYear(), base.getMonth(), base.getDate() + offsetDays);
+    state.tasks.unshift({
+      id: state.counter, no: "No." + String(state.counter).padStart(3, "0"),
+      title: t.title, note: t.note, createdAt: Date.now(), triaged: t.triaged,
+      urgent: t.urgent, important: t.important, status: "todo",
+      estPomodoros: t.estPomodoros, donePomodoros: 0, completedAt: null,
+      dueDate: todayKey(next), dueTime: t.dueTime, reminderMin: t.reminderMin, notifiedAt: null,
+      repeat: t.repeat
+    });
   }
   function setDueDate(id, value) {
     var t = findTask(id); if (!t) return;
@@ -944,8 +994,17 @@
       });
       html += '</select></label>';
     }
+    html += '<label class="due-field"><span>繰り返し</span><select data-repeat="' + t.id + '">' +
+      '<option value=""' + (!t.repeat ? " selected" : "") + '>なし</option>' +
+      '<option value="daily"' + (t.repeat === "daily" ? " selected" : "") + '>毎日</option>' +
+      '<option value="weekly"' + (t.repeat === "weekly" ? " selected" : "") + '>毎週</option>' +
+      '</select></label>';
     html += '</span>';
     return html;
+  }
+  function repeatPillHtml(t) {
+    if (!t.repeat) return "";
+    return '<span class="pill pill-repeat">↻ ' + (t.repeat === "daily" ? "毎日" : "毎週") + '</span>';
   }
 
   function renderInbox() {
@@ -958,7 +1017,7 @@
       html += '<div class="empty-state">受信箱は空です。頭の中のことを書き出しましょう。</div>';
     } else {
       html += untriaged.map(function (t) {
-        return '<div class="ticket"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span></div>' +
+        return '<div class="ticket"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' + repeatPillHtml(t) + '</div>' +
           '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
           (t.note ? '<p class="ticket-note">' + escapeHtml(t.note) + '</p>' : "") +
           '<div class="ticket-actions">' + ticketFlagsHtml(t) + ticketDueHtml(t) +
@@ -985,7 +1044,7 @@
         html += '<div class="empty-state">ここにはまだチケットがありません。</div>';
       } else {
         html += items.map(function (t) {
-          return '<div class="ticket"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span></div>' +
+          return '<div class="ticket"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' + repeatPillHtml(t) + '</div>' +
             '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
             '<div class="ticket-actions">' + ticketFlagsHtml(t) + ticketDueHtml(t) + '</div></div>';
         }).join("");
@@ -1079,7 +1138,7 @@
           var meta = QUAD_META[quadrantOf(t)];
           html += '<div class="ticket status-' + t.status + '" draggable="true" data-drag="' + t.id + '">' +
             '<div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' +
-            '<span class="pill ' + meta.cls + '">' + meta.title + '</span></div>' +
+            '<span class="pill ' + meta.cls + '">' + meta.title + '</span>' + repeatPillHtml(t) + '</div>' +
             '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
             (t.note ? '<p class="ticket-note">' + escapeHtml(t.note) + '</p>' : "") +
             '<div class="ticket-actions">' +
@@ -1145,34 +1204,27 @@
       return d >= stripTime(wk.start) && d <= stripTime(wk.end);
     }).length;
 
-    var html = viewHead("06 · PDCA", "振り返り", "計画・実行・評価・改善のサイクルで一週間をまとめる。ここで得た気づきは、また受信箱へ書き戻す。");
+    var html = viewHead("06 · WEEKLY REPORT", "週次報告書", "木曜始まり〜水曜終わりの1週間をまとめる。①②は「うまくいったこと」を意図の有無で分け、③〜⑤で改善・停止・相談を切り分ける。");
     html += '<div class="week-bar"><span class="week-range">今週 ' + wk.range + '</span></div>';
     html += '<div class="stat-chips"><span class="stat-chip">今週の完了 ' + doneThisWeek + ' 件</span><span class="stat-chip">今週の集中 ' + pomoThisWeek + ' 本</span></div>';
 
-    var fields = [
-      { k: "plan", cls: "p", letter: "P", name: "Plan / 計画", ph: "今週やると決めたことは？" },
-      { k: "do", cls: "d", letter: "D", name: "Do / 実行", ph: "実際にやったことは？" },
-      { k: "check", cls: "c", letter: "C", name: "Check / 評価", ph: "計画とのズレ、気づいたことは？" },
-      { k: "act", cls: "a", letter: "A", name: "Act / 改善", ph: "来週はどう変える？" }
-    ];
-    html += '<div class="pdca-grid">';
-    fields.forEach(function (f) {
-      html += '<div class="pdca-cell ' + f.cls + '"><div class="pdca-label">' +
-        '<span class="pdca-letter">' + f.letter + '</span><span class="pdca-name">' + f.name + '</span></div>' +
+    html += '<div class="report-grid">';
+    REPORT_FIELDS.forEach(function (f) {
+      html += '<div class="report-cell ' + f.cls + '"><div class="report-label">' +
+        '<span class="report-num">' + f.num + '</span><span class="report-name">' + f.name + '</span></div>' +
         '<textarea data-review-field="' + f.k + '" placeholder="' + f.ph + '">' + escapeHtml(rv[f.k]) + '</textarea></div>';
     });
     html += '</div>';
 
     var history = Object.keys(state.reviews).filter(function (k) { return k !== wk.key; }).sort().reverse();
     if (history.length) {
-      html += '<div class="history-title">これまでの振り返り</div>';
+      html += '<div class="history-title">これまでの週次報告</div>';
       history.forEach(function (key) {
         var r = state.reviews[key];
-        html += '<div class="history-item"><div class="history-week">' + key + '</div><div class="history-grid">' +
-          '<div><strong>Plan</strong>' + escapeHtml(r.plan || "—") + '</div>' +
-          '<div><strong>Do</strong>' + escapeHtml(r["do"] || "—") + '</div>' +
-          '<div><strong>Check</strong>' + escapeHtml(r.check || "—") + '</div>' +
-          '<div><strong>Act</strong>' + escapeHtml(r.act || "—") + '</div></div></div>';
+        html += '<div class="history-item"><div class="history-week">' + formatWeekRangeFromKey(key) + '</div><div class="history-grid">' +
+          REPORT_FIELDS.map(function (f) {
+            return '<div><strong>' + f.num + ' ' + f.name + '</strong>' + escapeHtml(r[f.k] || "—") + '</div>';
+          }).join("") + '</div></div>';
       });
     }
     return html;
@@ -1246,6 +1298,9 @@
     });
     Array.prototype.forEach.call(document.querySelectorAll("[data-due-remind]"), function (sel) {
       sel.addEventListener("change", function () { setReminder(Number(sel.dataset.dueRemind), sel.value); });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-repeat]"), function (sel) {
+      sel.addEventListener("change", function () { setRepeat(Number(sel.dataset.repeat), sel.value); });
     });
 
     // Calendar view
@@ -1328,7 +1383,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608122306").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608130537").catch(function () {});
     });
   }
 </script>
