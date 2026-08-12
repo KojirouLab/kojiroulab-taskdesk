@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608130537">
-<link rel="icon" href="icon-192.png?v=202608130537">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608130537">
+<link rel="manifest" href="manifest.json?v=202608130700">
+<link rel="icon" href="icon-192.png?v=202608130700">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608130700">
 <style>
   :root {
     --ink: #1C2321;
@@ -478,6 +478,71 @@
     return (d.getMonth() + 1) + "/" + d.getDate() + (t.dueTime ? " " + pad(d.getHours()) + ":" + pad(d.getMinutes()) : "");
   }
 
+  /* ---------------- Recurrence rules ---------------- */
+  var WEEKDAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"];
+  var NTH_NAMES = ["", "第1", "第2", "第3", "第4", "第5"];
+  function lastDayOfMonth(year, month) { return new Date(year, month + 1, 0).getDate(); } // monthは0-11超え可(自動繰上げ)
+  function nthWeekdayOfMonth(date) { return Math.floor((date.getDate() - 1) / 7) + 1; } // その月の第何◯曜日か(1-5)
+  function nthWeekdayDate(year, month, weekday, nth) {
+    var firstWeekday = new Date(year, month, 1).getDay();
+    var offset = (weekday - firstWeekday + 7) % 7;
+    var day = 1 + offset + (nth - 1) * 7;
+    var last = lastDayOfMonth(year, month);
+    if (day > last) day -= 7; // その月に第nth◯曜日が無ければ、ひとつ前(=最終)に丸める
+    return new Date(year, month, day);
+  }
+  function lastWeekdayDate(year, month, weekday) {
+    var d = new Date(year, month, lastDayOfMonth(year, month));
+    while (d.getDay() !== weekday) d.setDate(d.getDate() - 1);
+    return d;
+  }
+  function lastBusinessDayDate(year, month) {
+    var d = new Date(year, month, lastDayOfMonth(year, month));
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
+    return d;
+  }
+  // freq(文字列)と基準日から、次回の発生日を計算する。
+  function computeNextDate(base, freq) {
+    var y = base.getFullYear(), m = base.getMonth(), d = base.getDate();
+    switch (freq) {
+      case "daily": return new Date(y, m, d + 1);
+      case "weekly": return new Date(y, m, d + 7);
+      case "monthlyDate": return new Date(y, m + 1, Math.min(d, lastDayOfMonth(y, m + 1)));
+      case "monthlyNth": return nthWeekdayDate(y, m + 1, base.getDay(), nthWeekdayOfMonth(base));
+      case "monthlyLastWeekday": return lastWeekdayDate(y, m + 1, base.getDay());
+      case "monthlyFirstDay": return new Date(y, m + 1, 1);
+      case "monthlyLastDay": return new Date(y, m + 2, 0);
+      case "monthlyLastBusinessDay": return lastBusinessDayDate(y, m + 1);
+      default: return new Date(y, m, d + 7);
+    }
+  }
+  // 現在の期限日を基準に、選択肢の文言(第◯◯曜日など)を組み立てる。
+  function repeatOptionsHtml(t) {
+    var base = t.dueDate ? new Date(t.dueDate + "T00:00:00") : new Date();
+    var wdName = WEEKDAY_NAMES[base.getDay()] + "曜日";
+    var nth = nthWeekdayOfMonth(base);
+    var options = [
+      { v: "", label: "なし" },
+      { v: "daily", label: "毎日" },
+      { v: "weekly", label: "毎週" + wdName },
+      { v: "monthlyDate", label: "毎月" + base.getDate() + "日" },
+      { v: "monthlyNth", label: "毎月" + (NTH_NAMES[nth] || ("第" + nth)) + wdName },
+      { v: "monthlyLastWeekday", label: "毎月最終" + wdName },
+      { v: "monthlyFirstDay", label: "毎月月初め(1日)" },
+      { v: "monthlyLastDay", label: "毎月月末" },
+      { v: "monthlyLastBusinessDay", label: "毎月最終平日" }
+    ];
+    return options.map(function (o) {
+      return '<option value="' + o.v + '"' + (o.v === (t.repeat || "") ? " selected" : "") + '>' + o.label + '</option>';
+    }).join("");
+  }
+  function repeatPillLabel(freq) {
+    if (freq === "daily") return "毎日";
+    if (freq === "weekly") return "毎週";
+    if (freq && freq.indexOf("monthly") === 0) return "毎月";
+    return "";
+  }
+
   function seedState() {
     var now = Date.now();
     var day = 86400000;
@@ -630,12 +695,11 @@
     save(); render();
   }
   // 繰り返しタスクが完了した時、次回分のチケットを新規発行する。
-  // 起点は「完了した日」ではなく元の期限日(なければ今日)。毎週は+7日、毎日は+1日。
+  // 起点は「完了した日」ではなく元の期限日(なければ今日)。
   function spawnRecurrence(t) {
     state.counter += 1;
     var base = t.dueDate ? new Date(t.dueDate + "T00:00:00") : new Date();
-    var offsetDays = t.repeat === "daily" ? 1 : 7;
-    var next = new Date(base.getFullYear(), base.getMonth(), base.getDate() + offsetDays);
+    var next = computeNextDate(base, t.repeat);
     state.tasks.unshift({
       id: state.counter, no: "No." + String(state.counter).padStart(3, "0"),
       title: t.title, note: t.note, createdAt: Date.now(), triaged: t.triaged,
@@ -994,17 +1058,13 @@
       });
       html += '</select></label>';
     }
-    html += '<label class="due-field"><span>繰り返し</span><select data-repeat="' + t.id + '">' +
-      '<option value=""' + (!t.repeat ? " selected" : "") + '>なし</option>' +
-      '<option value="daily"' + (t.repeat === "daily" ? " selected" : "") + '>毎日</option>' +
-      '<option value="weekly"' + (t.repeat === "weekly" ? " selected" : "") + '>毎週</option>' +
-      '</select></label>';
+    html += '<label class="due-field"><span>繰り返し</span><select data-repeat="' + t.id + '">' + repeatOptionsHtml(t) + '</select></label>';
     html += '</span>';
     return html;
   }
   function repeatPillHtml(t) {
     if (!t.repeat) return "";
-    return '<span class="pill pill-repeat">↻ ' + (t.repeat === "daily" ? "毎日" : "毎週") + '</span>';
+    return '<span class="pill pill-repeat">↻ ' + repeatPillLabel(t.repeat) + '</span>';
   }
 
   function renderInbox() {
@@ -1383,7 +1443,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608130537").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608130700").catch(function () {});
     });
   }
 </script>
