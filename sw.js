@@ -1,7 +1,7 @@
 // タスクデスク Service Worker — app-shell caching for offline / installed-app use.
 // Bump CACHE_NAME on every deploy (same timestamp pattern as index.html's ?v= query strings)
 // so returning clients pick up the new version instead of a stale cached shell.
-const CACHE_NAME = "taskdesk-shell-202608122257";
+const CACHE_NAME = "taskdesk-shell-202608122306";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -28,20 +28,20 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+// ネットワーク優先: オンラインなら常に最新を取りに行き、キャッシュは
+// オフライン時のフォールバックとしてのみ使う(キャッシュ優先だと、デプロイ後も
+// 端末側が古いJSを表示し続けてしまう「反映されない」問題の原因になるため)。
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const network = fetch(event.request)
-        .then((res) => {
-          if (res && res.status === 200) {
-            const copy = res.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-          }
-          return res;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
+    fetch(event.request)
+      .then((res) => {
+        if (res && res.status === 200) {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
+        return res;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
