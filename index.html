@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608131945">
-<link rel="icon" href="icon-192.png?v=202608131945">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608131945">
+<link rel="manifest" href="manifest.json?v=202608132002">
+<link rel="icon" href="icon-192.png?v=202608132002">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608132002">
 <style>
   :root {
     --ink: #1C2321;
@@ -721,10 +721,14 @@
     if (becameDone && t.repeat) spawnRecurrence(t);
     touch(t); save(); render();
   }
+  // date/time/select系のネイティブ入力は、変更確定と同時に閉じるアニメーションが
+  // 走っている。その最中に同期的にrender()して要素を作り直すと、iOSでピッカーが
+  // 閉じる動作自体を邪魔してしまう(消えたように見える)ため、1ティック遅らせる。
+  function deferRender() { setTimeout(render, 0); }
   function setRepeat(id, value) {
     var t = findTask(id); if (!t) return;
     t.repeat = value || null;
-    touch(t); save(); render();
+    touch(t); save(); deferRender();
   }
   // 繰り返しタスクが完了した時、次回分のチケットを新規発行する。
   // 起点は「完了した日」ではなく元の期限日(なければ今日)。
@@ -746,13 +750,13 @@
     t.dueDate = value || null;
     if (!t.dueDate) { t.dueTime = null; t.reminderMin = null; }
     t.notifiedAt = null;
-    touch(t); save(); render();
+    touch(t); save(); deferRender();
   }
   function setDueTime(id, value) {
     var t = findTask(id); if (!t) return;
     t.dueTime = value || null;
     t.notifiedAt = null;
-    touch(t); save(); render();
+    touch(t); save(); deferRender();
   }
   function setReminder(id, value) {
     var t = findTask(id); if (!t) return;
@@ -760,7 +764,7 @@
     t.notifiedAt = null;
     touch(t); save();
     if (t.reminderMin != null) ensureNotifyPermission();
-    render();
+    deferRender();
   }
 
   function quadrantOf(t) {
@@ -1599,7 +1603,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608131945").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608132002").catch(function () {});
     });
   }
 </script>
