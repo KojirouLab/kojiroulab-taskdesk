@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608131117">
-<link rel="icon" href="icon-192.png?v=202608131117">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608131117">
+<link rel="manifest" href="manifest.json?v=202608131945">
+<link rel="icon" href="icon-192.png?v=202608131945">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608131945">
 <style>
   :root {
     --ink: #1C2321;
@@ -920,6 +920,20 @@
     return id;
   }
   var syncState = { status: "idle", lastSyncedAt: null, formOpen: false }; // idle | busy | ok | err | offline
+
+  // バックグラウンドの自動同期がrender()で#mainを丸ごと作り直すと、日付/時刻ピッカーを
+  // 操作している最中の<input>ごと消えてしまい、モバイルではピッカーが勝手に閉じる。
+  // フォーム操作中はrender()を保留し、フォーカスが外れたタイミングで反映する。
+  var pendingRender = false;
+  function mainEditingActive() {
+    var el = document.activeElement;
+    var main = document.getElementById("main");
+    return !!(el && main && main.contains(el) && (el.tagName === "INPUT" || el.tagName === "SELECT" || el.tagName === "TEXTAREA"));
+  }
+  function renderOrDefer() {
+    if (mainEditingActive()) { pendingRender = true; return; }
+    render();
+  }
   // 同期するのは実データのみ。activeView/calCursor/timerは端末ごとのローカルなUI状態なので
   // 同期対象から外す(混ぜると、他端末の「今どの画面を見ていたか」で表示が勝手に切り替わってしまう)。
   var SYNC_FIELDS = ["tasks", "reviews", "pomodoroLog", "counter", "timerSettings", "updatedAt"];
@@ -952,7 +966,7 @@
         var incoming = rows[0].data;
         SYNC_FIELDS.forEach(function (k) { if (k in incoming) state[k] = incoming[k]; });
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        render();
+        renderOrDefer();
       } else if (force && (!rows || !rows[0])) {
         // 接続先にまだデータが無ければ、この端末のデータをそのコードへ送る
         pushRemote();
@@ -1568,6 +1582,12 @@
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "visible") pullRemote();
   });
+  // 保留していた再描画を、ユーザーがフォーム操作から離れたタイミングで反映する。
+  document.getElementById("main").addEventListener("focusout", function () {
+    setTimeout(function () {
+      if (pendingRender && !mainEditingActive()) { pendingRender = false; render(); }
+    }, 300);
+  });
 
   handleGoogleRedirectParams();
   if (googleState.status === "checking") triggerGoogleSync();
@@ -1579,7 +1599,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608131117").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608131945").catch(function () {});
     });
   }
 </script>

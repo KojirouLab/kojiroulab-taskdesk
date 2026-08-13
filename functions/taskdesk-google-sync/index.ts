@@ -87,12 +87,14 @@ async function listAllEvents(accessToken: string, calendarId: string) {
   return events;
 }
 
+const TIME_ZONE = 'Asia/Tokyo';
+
 function eventDateFields(startDate: string, startTime: string | null) {
   if (startTime) {
-    // タイムゾーン変換の複雑さを避けるため、ローカル時刻文字列としてそのまま渡す
-    // (Google側はカレンダーのデフォルトタイムゾーンで解釈する)。
-    const start = { dateTime: `${startDate}T${startTime}:00` };
-    const end = { dateTime: `${startDate}T${startTime}:00` }; // 30分イベントにする
+    // ローカル時刻文字列をそのまま渡し、timeZoneで明示する
+    // (timeZoneを省略するとGoogle Calendar APIが400を返す)。
+    const start = { dateTime: `${startDate}T${startTime}:00`, timeZone: TIME_ZONE };
+    const end = { dateTime: `${startDate}T${startTime}:00`, timeZone: TIME_ZONE }; // 30分イベントにする
     const [h, m] = startTime.split(':').map(Number);
     const endMinutes = h * 60 + m + 30;
     const endH = Math.floor(endMinutes / 60) % 24;
