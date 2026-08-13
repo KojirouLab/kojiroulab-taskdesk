@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608130756">
-<link rel="icon" href="icon-192.png?v=202608130756">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608130756">
+<link rel="manifest" href="manifest.json?v=202608131031">
+<link rel="icon" href="icon-192.png?v=202608131031">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608131031">
 <style>
   :root {
     --ink: #1C2321;
@@ -424,6 +424,7 @@
     <nav class="rail-nav" id="railNav"></nav>
     <div class="rail-meta">
       <div class="sync-status" id="syncStatus"></div>
+      <div class="sync-status" id="googleStatus"></div>
       <div class="notify-status" id="notifyStatus"></div>
       <div class="rail-stats">
         <div><span id="statTotal">0</span><label>総チケット</label></div>
@@ -447,10 +448,14 @@
   var STORAGE_KEY = "taskdesk.v1";
   var SYNC_ID_KEY = "taskdesk.syncId";
 
-  // task-calendarと同じSupabaseプロジェクトに間借りしている(taskdesk_stateテーブルのみ使用)。
+  // task-calendarと同じSupabaseプロジェクトに間借りしている(taskdesk_state / taskdesk_google_accounts テーブルを使用)。
   // anon keyは公開して問題ない設計(RLSで、同期コードを知っている端末だけが読み書きできる)。
   var SUPABASE_URL = "https://ylvvjqwbhfggwjivkgvr.supabase.co";
   var SUPABASE_ANON_KEY = "sb_publishable_Qjz-ym0gL42g3Hbv8tx8qQ_ylLEt3B_";
+  // task-calendarのGoogle Cloud OAuthクライアントを再利用(client_idは公開情報として埋め込んで問題ない)。
+  var GOOGLE_CLIENT_ID = "647666710506-ei4vdt815losatj0sl3r22k1b4bmth7d.apps.googleusercontent.com";
+  var GOOGLE_OAUTH_REDIRECT_URI = SUPABASE_URL + "/functions/v1/taskdesk-google-oauth-callback";
+  var GOOGLE_SYNC_FN_URL = SUPABASE_URL + "/functions/v1/taskdesk-google-sync";
 
   var VIEWS = [
     { id: "inbox",    num: "01", jp: "受信箱",     en: "INBOX"    },
@@ -586,12 +591,18 @@
       updatedAt: 0
     };
   }
+  // Googleカレンダー同期用フィールドの既定値を全タスクへ補う(初期シード/読み込み共通)。
+  function ensureGoogleFields(t) {
+    if (!("googleEventId" in t)) t.googleEventId = null;
+    if (!("googleSyncedAt" in t)) t.googleSyncedAt = null;
+    if (!("touchedAt" in t)) t.touchedAt = t.createdAt || Date.now();
+  }
 
   var state = load();
   function load() {
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return seedState();
+      if (!raw) { var seeded = seedState(); seeded.tasks.forEach(ensureGoogleFields); return seeded; }
       var parsed = JSON.parse(raw);
       if (parsed.timer) parsed.timer.running = false;
       if (!parsed.calCursor) parsed.calCursor = { year: new Date().getFullYear(), month: new Date().getMonth() };
@@ -602,6 +613,7 @@
         if (!("reminderMin" in t)) t.reminderMin = null;
         if (!("notifiedAt" in t)) t.notifiedAt = null;
         if (!("repeat" in t)) t.repeat = null;
+        ensureGoogleFields(t);
       });
       Object.keys(parsed.reviews || {}).forEach(function (k) {
         var r = parsed.reviews[k];
@@ -610,7 +622,7 @@
         });
       });
       return parsed;
-    } catch (e) { return seedState(); }
+    } catch (e) { var seeded = seedState(); seeded.tasks.forEach(ensureGoogleFields); return seeded; }
   }
   function save(skipSync) {
     state.updatedAt = Date.now();
@@ -664,23 +676,25 @@
       id: state.counter, no: "No." + String(state.counter).padStart(3, "0"),
       title: title, note: "", createdAt: Date.now(), triaged: false,
       urgent: null, important: null, status: "todo", estPomodoros: 2, donePomodoros: 0, completedAt: null,
-      dueDate: null, dueTime: null, reminderMin: null, notifiedAt: null, repeat: null
+      dueDate: null, dueTime: null, reminderMin: null, notifiedAt: null, repeat: null,
+      googleEventId: null, googleSyncedAt: null, touchedAt: Date.now()
     });
     save(); render();
   }
   function findTask(id) { return state.tasks.find(function (t) { return t.id === id; }); }
+  function touch(t) { t.touchedAt = Date.now(); }
   function toggleFlag(id, flag) {
     var t = findTask(id); if (!t) return;
     t[flag] = !t[flag];
     if (t.urgent === null) t.urgent = false;
     if (t.important === null) t.important = false;
-    save(); render();
+    touch(t); save(); render();
   }
   function sendToBoard(id) {
     var t = findTask(id); if (!t) return;
     if (t.urgent === null) t.urgent = false;
     if (t.important === null) t.important = false;
-    t.triaged = true; save(); render();
+    t.triaged = true; touch(t); save(); render();
   }
   function deleteTask(id) {
     state.tasks = state.tasks.filter(function (t) { return t.id !== id; });
@@ -697,7 +711,7 @@
     t.status = newStatus;
     t.completedAt = newStatus === "done" ? Date.now() : null;
     if (becameDone && t.repeat) spawnRecurrence(t);
-    save(); render();
+    touch(t); save(); render();
   }
   function setStatus(id, status) {
     var t = findTask(id); if (!t) return;
@@ -705,12 +719,12 @@
     t.status = status;
     t.completedAt = status === "done" ? Date.now() : null;
     if (becameDone && t.repeat) spawnRecurrence(t);
-    save(); render();
+    touch(t); save(); render();
   }
   function setRepeat(id, value) {
     var t = findTask(id); if (!t) return;
     t.repeat = value || null;
-    save(); render();
+    touch(t); save(); render();
   }
   // 繰り返しタスクが完了した時、次回分のチケットを新規発行する。
   // 起点は「完了した日」ではなく元の期限日(なければ今日)。
@@ -724,7 +738,7 @@
       urgent: t.urgent, important: t.important, status: "todo",
       estPomodoros: t.estPomodoros, donePomodoros: 0, completedAt: null,
       dueDate: todayKey(next), dueTime: t.dueTime, reminderMin: t.reminderMin, notifiedAt: null,
-      repeat: t.repeat
+      repeat: t.repeat, googleEventId: null, googleSyncedAt: null, touchedAt: Date.now()
     });
   }
   function setDueDate(id, value) {
@@ -732,19 +746,19 @@
     t.dueDate = value || null;
     if (!t.dueDate) { t.dueTime = null; t.reminderMin = null; }
     t.notifiedAt = null;
-    save(); render();
+    touch(t); save(); render();
   }
   function setDueTime(id, value) {
     var t = findTask(id); if (!t) return;
     t.dueTime = value || null;
     t.notifiedAt = null;
-    save(); render();
+    touch(t); save(); render();
   }
   function setReminder(id, value) {
     var t = findTask(id); if (!t) return;
     t.reminderMin = value === "" ? null : Number(value);
     t.notifiedAt = null;
-    save();
+    touch(t); save();
     if (t.reminderMin != null) ensureNotifyPermission();
     render();
   }
@@ -1011,6 +1025,87 @@
     }
   }
 
+  /* ---------------- Google Calendar (双方向) ---------------- */
+  // checking | connected | disconnected | busy | err
+  var googleState = { status: "checking", lastSyncedAt: null };
+  function connectGoogleCalendar() {
+    var params = new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      redirect_uri: GOOGLE_OAUTH_REDIRECT_URI,
+      response_type: "code",
+      scope: "https://www.googleapis.com/auth/calendar",
+      access_type: "offline",
+      prompt: "consent", // 毎回同意を求め、確実にrefresh_tokenを受け取る
+      state: getSyncId()
+    });
+    window.location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + params.toString();
+  }
+  function triggerGoogleSync() {
+    googleState.status = "busy"; updateGoogleStatus();
+    return fetch(GOOGLE_SYNC_FN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ syncId: getSyncId() })
+    }).then(function (res) { return res.json(); })
+      .then(function (result) {
+        if (result && result.connected === false) {
+          googleState.status = "disconnected";
+        } else if (!result || result.error) {
+          googleState.status = "err";
+        } else {
+          googleState.status = "connected";
+          googleState.lastSyncedAt = Date.now();
+          pullRemote(); // Google側の変更をこの端末のタスクへ即座に取り込む
+        }
+        updateGoogleStatus();
+      }).catch(function () {
+        googleState.status = "err"; updateGoogleStatus();
+      });
+  }
+  // Googleの認可画面から戻ってきた時(?google=connected|error)の後処理。
+  function handleGoogleRedirectParams() {
+    var params = new URLSearchParams(window.location.search);
+    var g = params.get("google");
+    if (!g) return;
+    if (g === "connected") {
+      pushToast("Googleカレンダーと接続しました");
+      triggerGoogleSync();
+    } else {
+      pushToast("Googleカレンダー連携に失敗しました(" + (params.get("detail") || "unknown") + ")");
+      googleState.status = "disconnected";
+      updateGoogleStatus();
+    }
+    params.delete("google"); params.delete("detail");
+    var qs = params.toString();
+    history.replaceState(null, "", window.location.pathname + (qs ? "?" + qs : ""));
+  }
+  function updateGoogleStatus() {
+    var el = document.getElementById("googleStatus");
+    if (!el) return;
+    var html;
+    if (googleState.status === "connected") {
+      html = '<div class="sync-row"><span class="sync-dot ok"></span><span>📅 Google連携 有効</span></div>' +
+        '<div class="sync-meta">' + relativeTime(googleState.lastSyncedAt) + '</div>' +
+        '<button class="sync-link-btn" id="googleSyncNowBtn">今すぐ同期</button>';
+    } else if (googleState.status === "busy") {
+      html = '<div class="sync-row"><span class="sync-dot busy"></span><span>📅 同期中…</span></div>';
+    } else if (googleState.status === "checking") {
+      html = '<div class="sync-row"><span class="sync-dot"></span><span>📅 確認中…</span></div>';
+    } else if (googleState.status === "err") {
+      html = '<div class="sync-row"><span class="sync-dot err"></span><span>📅 同期エラー</span></div>' +
+        '<button class="sync-link-btn" id="googleRetryBtn">再試行</button>';
+    } else {
+      html = '<button class="btn btn-sm notify-request-btn" id="googleConnectBtn">📅 Googleカレンダーと接続</button>';
+    }
+    el.innerHTML = html;
+    var connectBtn = document.getElementById("googleConnectBtn");
+    if (connectBtn) connectBtn.addEventListener("click", connectGoogleCalendar);
+    var syncNowBtn = document.getElementById("googleSyncNowBtn");
+    if (syncNowBtn) syncNowBtn.addEventListener("click", triggerGoogleSync);
+    var retryBtn = document.getElementById("googleRetryBtn");
+    if (retryBtn) retryBtn.addEventListener("click", triggerGoogleSync);
+  }
+
   /* ---------------- Rendering ---------------- */
   function switchView(id) { state.activeView = id; render(); }
 
@@ -1042,6 +1137,7 @@
     updateRailCounts();
     updateNotifyStatus();
     updateSyncStatus();
+    updateGoogleStatus();
   }
 
   function updateRailCounts() {
@@ -1203,6 +1299,14 @@
     for (var i = 0; i < t.estPomodoros; i++) s += i < t.donePomodoros ? "●" : "○";
     return s;
   }
+  // 期限が近い順。期限未定は末尾、同じ日付なら時刻ありを先に。
+  function compareByDue(a, b) {
+    if (!a.dueDate && !b.dueDate) return 0;
+    if (!a.dueDate) return 1;
+    if (!b.dueDate) return -1;
+    var am = dueDateTimeMs(a), bm = dueDateTimeMs(b);
+    return am - bm;
+  }
 
   function renderBoard() {
     var cols = [
@@ -1211,10 +1315,10 @@
       { id: "done", title: "完了" }
     ];
     var triaged = state.tasks.filter(function (t) { return t.triaged; });
-    var html = viewHead("04 · KANBAN", "ボード", "看板方式でチケットの状態を可視化する。カードは" + (IS_TOUCH ? "矢印ボタンで" : "矢印ボタンかドラッグで") + "隣の列へ動かせる。");
+    var html = viewHead("04 · KANBAN", "ボード", "看板方式でチケットの状態を可視化する。カードは" + (IS_TOUCH ? "矢印ボタンで" : "矢印ボタンかドラッグで") + "隣の列へ動かせる。期限が近い順に並ぶ(期限未定は末尾)。");
     html += '<div class="board">';
     cols.forEach(function (col, ci) {
-      var items = triaged.filter(function (t) { return t.status === col.id; });
+      var items = triaged.filter(function (t) { return t.status === col.id; }).sort(compareByDue);
       html += '<div><div class="col-head"><span class="col-title">' + col.title + '</span><span class="col-count">' + items.length + '</span></div>' +
         '<div class="col-drop" data-col="' + col.id + '">';
       if (!items.length) {
@@ -1464,12 +1568,18 @@
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "visible") pullRemote();
   });
+
+  handleGoogleRedirectParams();
+  if (googleState.status === "checking") triggerGoogleSync();
+  setInterval(function () {
+    if (googleState.status !== "disconnected") triggerGoogleSync();
+  }, 90000);
 })();
 </script>
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608130756").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608131031").catch(function () {});
     });
   }
 </script>
