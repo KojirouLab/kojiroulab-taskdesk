@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608132002">
-<link rel="icon" href="icon-192.png?v=202608132002">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608132002">
+<link rel="manifest" href="manifest.json?v=202608132016">
+<link rel="icon" href="icon-192.png?v=202608132016">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608132016">
 <style>
   :root {
     --ink: #1C2321;
@@ -890,6 +890,7 @@
     if (changed) save();
   }
   function updateNotifyStatus() {
+    if (mainEditingActive()) return; // 他の場所のDOM更新も、入力中のピッカーをiOSが閉じる引き金になるため止める
     var el = document.getElementById("notifyStatus");
     if (!el) return;
     if (!("Notification" in window)) {
@@ -1016,6 +1017,7 @@
     return Math.round(diff / 3600) + "時間前";
   }
   function updateSyncStatus() {
+    if (mainEditingActive()) return;
     var el = document.getElementById("syncStatus");
     if (!el) return;
     var dotCls = { idle: "", busy: "busy", ok: "ok", err: "err", offline: "" }[syncState.status] || "";
@@ -1098,6 +1100,7 @@
     history.replaceState(null, "", window.location.pathname + (qs ? "?" + qs : ""));
   }
   function updateGoogleStatus() {
+    if (mainEditingActive()) return;
     var el = document.getElementById("googleStatus");
     if (!el) return;
     var html;
@@ -1159,6 +1162,7 @@
   }
 
   function updateRailCounts() {
+    if (mainEditingActive()) return;
     document.getElementById("statTotal").textContent = state.tasks.length;
     document.getElementById("statDone").textContent = state.tasks.filter(function (t) { return t.status === "done"; }).length;
     var today = todayKey();
@@ -1603,7 +1607,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608132002").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608132016").catch(function () {});
     });
   }
 </script>
