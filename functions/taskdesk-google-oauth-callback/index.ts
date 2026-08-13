@@ -13,14 +13,16 @@
 // Deploy via the Supabase Dashboard (Edge Functions > Deploy a new function
 // > Via Editor). Turn OFF "Enforce JWT Verification" for this function -
 // Google's redirect here is a plain unauthenticated GET request.
-// Reuses the same GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET secrets already
-// set up for task-calendar. SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are
-// injected automatically.
+// Requires secrets TASKDESK_GOOGLE_CLIENT_ID and TASKDESK_GOOGLE_CLIENT_SECRET
+// (a dedicated OAuth client - separate from task-calendar's own, since Edge
+// Function secrets are shared project-wide by name and task-calendar's
+// functions already use the plain GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET
+// names). SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are injected automatically.
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID')!;
-const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET')!;
+const GOOGLE_CLIENT_ID = Deno.env.get('TASKDESK_GOOGLE_CLIENT_ID')!;
+const GOOGLE_CLIENT_SECRET = Deno.env.get('TASKDESK_GOOGLE_CLIENT_SECRET')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 

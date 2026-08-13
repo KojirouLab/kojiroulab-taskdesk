@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608131031">
-<link rel="icon" href="icon-192.png?v=202608131031">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608131031">
+<link rel="manifest" href="manifest.json?v=202608131117">
+<link rel="icon" href="icon-192.png?v=202608131117">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608131117">
 <style>
   :root {
     --ink: #1C2321;
@@ -452,8 +452,8 @@
   // anon keyは公開して問題ない設計(RLSで、同期コードを知っている端末だけが読み書きできる)。
   var SUPABASE_URL = "https://ylvvjqwbhfggwjivkgvr.supabase.co";
   var SUPABASE_ANON_KEY = "sb_publishable_Qjz-ym0gL42g3Hbv8tx8qQ_ylLEt3B_";
-  // task-calendarのGoogle Cloud OAuthクライアントを再利用(client_idは公開情報として埋め込んで問題ない)。
-  var GOOGLE_CLIENT_ID = "647666710506-ei4vdt815losatj0sl3r22k1b4bmth7d.apps.googleusercontent.com";
+  // taskdesk専用のGoogle Cloud OAuthクライアント(client_idは公開情報として埋め込んで問題ない)。
+  var GOOGLE_CLIENT_ID = "77479233975-46fbv93ldli7n3d6vqdm8t2v3hbolc8m.apps.googleusercontent.com";
   var GOOGLE_OAUTH_REDIRECT_URI = SUPABASE_URL + "/functions/v1/taskdesk-google-oauth-callback";
   var GOOGLE_SYNC_FN_URL = SUPABASE_URL + "/functions/v1/taskdesk-google-sync";
 
@@ -1579,7 +1579,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608131031").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608131117").catch(function () {});
     });
   }
 </script>

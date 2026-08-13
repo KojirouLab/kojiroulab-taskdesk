@@ -27,13 +27,13 @@
 // > Via Editor). Turn OFF "Enforce JWT Verification" - taskdesk has no
 // login, so there's no Supabase Auth JWT to check; the sync code in the
 // request body is the only access control, same trust model as
-// taskdesk_state's anon RLS policy. Requires the same GOOGLE_CLIENT_ID /
-// GOOGLE_CLIENT_SECRET secrets as taskdesk-google-oauth-callback.
+// taskdesk_state's anon RLS policy. Requires the same TASKDESK_GOOGLE_CLIENT_ID /
+// TASKDESK_GOOGLE_CLIENT_SECRET secrets as taskdesk-google-oauth-callback.
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID')!;
-const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET')!;
+const GOOGLE_CLIENT_ID = Deno.env.get('TASKDESK_GOOGLE_CLIENT_ID')!;
+const GOOGLE_CLIENT_SECRET = Deno.env.get('TASKDESK_GOOGLE_CLIENT_SECRET')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
