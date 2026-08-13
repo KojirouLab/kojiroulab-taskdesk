@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608132029">
-<link rel="icon" href="icon-192.png?v=202608132029">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608132029">
+<link rel="manifest" href="manifest.json?v=202608132044">
+<link rel="icon" href="icon-192.png?v=202608132044">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608132044">
 <style>
   :root {
     --ink: #1C2321;
@@ -1526,7 +1526,9 @@
       var h = document.querySelector('[data-due-hour="' + id + '"]');
       var m = document.querySelector('[data-due-min="' + id + '"]');
       if (!h || !m) return;
-      setDueTime(id, (h.value && m.value) ? (h.value + ":" + m.value) : null);
+      if (!h.value && !m.value) { setDueTime(id, null); return; } // 両方未設定の時だけクリア扱い
+      // 片方だけ選んだ場合は、もう片方を00として仮確定する(選んだ方が再描画で消えないように)。
+      setDueTime(id, (h.value || "00") + ":" + (m.value || "00"));
     }
     Array.prototype.forEach.call(document.querySelectorAll("[data-due-hour]"), function (sel) {
       sel.addEventListener("change", function () { applyHourMin(Number(sel.dataset.dueHour)); });
@@ -1636,7 +1638,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608132029").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608132044").catch(function () {});
     });
   }
 </script>
