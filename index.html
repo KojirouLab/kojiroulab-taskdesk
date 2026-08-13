@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608132016">
-<link rel="icon" href="icon-192.png?v=202608132016">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608132016">
+<link rel="manifest" href="manifest.json?v=202608132029">
+<link rel="icon" href="icon-192.png?v=202608132029">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608132029">
 <style>
   :root {
     --ink: #1C2321;
@@ -1190,11 +1190,28 @@
       '<button class="flag-toggle' + (t.important ? " on-important" : "") + '" data-flag="important" data-id="' + t.id + '">重要' + (t.important ? " ✓" : "") + '</button>';
   }
 
+  // iOSのネイティブ<input type="time">は、時・分の片方が確定した時点でピッカーごと
+  // 閉じてしまい両方揃える前に終わってしまう。時・分を別々のselectに分け、それぞれ
+  // 単独の値として確実に選べるようにする。
+  function timeSelectOptions(current, max) {
+    var html = '<option value=""' + (current === "" ? " selected" : "") + '>--</option>';
+    for (var i = 0; i <= max; i++) {
+      var v = pad(i);
+      html += '<option value="' + v + '"' + (current === v ? " selected" : "") + '>' + v + '</option>';
+    }
+    return html;
+  }
   function ticketDueHtml(t) {
     var html = '<span class="due-group' + (isOverdue(t) ? " overdue" : "") + '">' +
       '<label class="due-field"><span>期限</span><input type="date" data-due-date="' + t.id + '" value="' + (t.dueDate || "") + '"></label>';
     if (t.dueDate) {
-      html += '<label class="due-field"><span>時刻</span><input type="time" data-due-time="' + t.id + '" value="' + (t.dueTime || "") + '"></label>';
+      var hh = t.dueTime ? t.dueTime.split(":")[0] : "";
+      var mm = t.dueTime ? t.dueTime.split(":")[1] : "";
+      html += '<label class="due-field"><span>時刻</span>' +
+        '<select data-due-hour="' + t.id + '">' + timeSelectOptions(hh, 23) + '</select>:' +
+        '<select data-due-min="' + t.id + '">' + timeSelectOptions(mm, 59) + '</select>' +
+        (t.dueTime ? '<button type="button" class="btn-ghost" data-due-time-clear="' + t.id + '" title="時刻をクリア">×</button>' : '') +
+        '</label>';
       html += '<label class="due-field"><span>通知</span><select data-due-remind="' + t.id + '">';
       REMINDER_OPTIONS.forEach(function (opt) {
         var sel = t.reminderMin === opt.v ? " selected" : "";
@@ -1505,8 +1522,20 @@
     Array.prototype.forEach.call(document.querySelectorAll("[data-due-date]"), function (input) {
       input.addEventListener("change", function () { setDueDate(Number(input.dataset.dueDate), input.value); });
     });
-    Array.prototype.forEach.call(document.querySelectorAll("[data-due-time]"), function (input) {
-      input.addEventListener("change", function () { setDueTime(Number(input.dataset.dueTime), input.value); });
+    function applyHourMin(id) {
+      var h = document.querySelector('[data-due-hour="' + id + '"]');
+      var m = document.querySelector('[data-due-min="' + id + '"]');
+      if (!h || !m) return;
+      setDueTime(id, (h.value && m.value) ? (h.value + ":" + m.value) : null);
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("[data-due-hour]"), function (sel) {
+      sel.addEventListener("change", function () { applyHourMin(Number(sel.dataset.dueHour)); });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-due-min]"), function (sel) {
+      sel.addEventListener("change", function () { applyHourMin(Number(sel.dataset.dueMin)); });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-due-time-clear]"), function (btn) {
+      btn.addEventListener("click", function () { setDueTime(Number(btn.dataset.dueTimeClear), null); });
     });
     Array.prototype.forEach.call(document.querySelectorAll("[data-due-remind]"), function (sel) {
       sel.addEventListener("change", function () { setReminder(Number(sel.dataset.dueRemind), sel.value); });
@@ -1607,7 +1636,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608132016").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608132029").catch(function () {});
     });
   }
 </script>
