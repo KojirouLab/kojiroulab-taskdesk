@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608132044">
-<link rel="icon" href="icon-192.png?v=202608132044">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608132044">
+<link rel="manifest" href="manifest.json?v=202608140915">
+<link rel="icon" href="icon-192.png?v=202608140915">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608140915">
 <style>
   :root {
     --ink: #1C2321;
@@ -183,7 +183,7 @@
   @keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 
   /* ---------- Main ---------- */
-  main { padding: 30px 40px 60px; max-width: 980px; }
+  main { padding: 30px 40px 60px; }
   .view-head { margin-bottom: 22px; }
   .view-eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; color: var(--amber); margin-bottom: 6px; }
   .view-title { font-size: 25px; font-weight: 700; text-wrap: balance; margin: 0 0 6px; }
@@ -1638,7 +1638,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608132044").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608140915").catch(function () {});
     });
   }
 </script>
