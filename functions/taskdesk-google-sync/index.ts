@@ -110,14 +110,19 @@ function eventDateFields(startDate: string, startTime: string | null) {
   return { start: { date: startDate }, end: { date: addDay(startDate) } };
 }
 
+// Deno Edge Functionの実行環境はUTC基準で動いているため、Date#getHours()等の
+// "ローカル時刻" はUTCになってしまう。一度Intl.DateTimeFormat(timeZone指定)で
+// 直そうとしたが、この実行環境ではICUデータの都合か効かなかったため、
+// 日本時間には夏時間が無いことを利用して単純にUTC+9時間を足す方式にする
+// (ICU/Intlに依存しないので確実)。
 function fieldsFromEvent(ev: any): { title: string; note: string; dueDate: string | null; dueTime: string | null } {
   const title = ev.summary || '(無題)';
   const note = ev.description || '';
   if (ev.start?.date) return { title, note, dueDate: ev.start.date, dueTime: null };
   if (ev.start?.dateTime) {
-    const d = new Date(ev.start.dateTime);
-    const dueDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const dueTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const jst = new Date(new Date(ev.start.dateTime).getTime() + 9 * 60 * 60 * 1000);
+    const dueDate = `${jst.getUTCFullYear()}-${String(jst.getUTCMonth() + 1).padStart(2, '0')}-${String(jst.getUTCDate()).padStart(2, '0')}`;
+    const dueTime = `${String(jst.getUTCHours()).padStart(2, '0')}:${String(jst.getUTCMinutes()).padStart(2, '0')}`;
     return { title, note, dueDate, dueTime };
   }
   return { title, note, dueDate: null, dueTime: null };
@@ -155,9 +160,18 @@ Deno.serve(async (req) => {
     }
     const data = stateRow.data;
     const tasks: any[] = Array.isArray(data.tasks) ? data.tasks : [];
+    const pendingDeletes: string[] = Array.isArray(data.pendingGoogleDeletes) ? data.pendingGoogleDeletes : [];
 
     const accessToken = await refreshAccessToken(account.refresh_token);
     const calendarId = account.calendar_id;
+
+    // クライアント側でタスクごと削除された分は、まずGoogle側のイベントを消しておく。
+    // ここより後でイベント一覧を取ると、消し忘れたイベントが「孤立イベント」として
+    // 新しいタスクに復活してしまう(実際に起きた不具合)。
+    for (const eventId of pendingDeletes) {
+      await gcal(accessToken, calendarId, 'DELETE', `/events/${eventId}`);
+    }
+
     const events = await listAllEvents(accessToken, calendarId);
     const eventById = new Map(events.map((e) => [e.id, e]));
 
@@ -233,7 +247,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const newData = { ...data, tasks: nextTasks, counter, updatedAt: now };
+    const newData = { ...data, tasks: nextTasks, counter, updatedAt: now, pendingGoogleDeletes: [] };
     await sb.from('taskdesk_state').update({ data: newData, updated_at: new Date(now).toISOString() }).eq('id', syncId);
 
     return new Response(JSON.stringify({ connected: true, taskCount: nextTasks.length }), {

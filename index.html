@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608140926">
-<link rel="icon" href="icon-192.png?v=202608140926">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608140926">
+<link rel="manifest" href="manifest.json?v=202608150845">
+<link rel="icon" href="icon-192.png?v=202608150845">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608150845">
 <style>
   :root {
     --ink: #1C2321;
@@ -597,7 +597,8 @@
       reviews: {},
       timerSettings: { work: 25, brk: 5 },
       timer: { mode: "work", remaining: 25 * 60, running: false, sessionCount: 0, taskId: null },
-      updatedAt: 0
+      updatedAt: 0,
+      pendingGoogleDeletes: []
     };
   }
   // Googleカレンダー同期用フィールドの既定値を全タスクへ補う(初期シード/読み込み共通)。
@@ -618,6 +619,7 @@
       if (!("day" in parsed.calCursor)) parsed.calCursor.day = new Date().getDate();
       if (!parsed.calMode) parsed.calMode = "month";
       if (!("updatedAt" in parsed)) parsed.updatedAt = 0;
+      if (!Array.isArray(parsed.pendingGoogleDeletes)) parsed.pendingGoogleDeletes = [];
       (parsed.tasks || []).forEach(function (t) {
         if (!("dueDate" in t)) t.dueDate = null;
         if (!("dueTime" in t)) t.dueTime = null;
@@ -708,9 +710,12 @@
     t.triaged = true; touch(t); save(); render();
   }
   function deleteTask(id) {
+    var t = findTask(id);
+    if (t && t.googleEventId) state.pendingGoogleDeletes.push(t.googleEventId);
     state.tasks = state.tasks.filter(function (t) { return t.id !== id; });
     if (state.timer.taskId === id) state.timer.taskId = null;
     save(); render();
+    if (t && t.googleEventId) triggerGoogleSync();
   }
   var STATUS_ORDER = ["todo", "doing", "done"];
   function moveStatus(id, dir) {
@@ -952,7 +957,7 @@
   }
   // 同期するのは実データのみ。activeView/calCursor/timerは端末ごとのローカルなUI状態なので
   // 同期対象から外す(混ぜると、他端末の「今どの画面を見ていたか」で表示が勝手に切り替わってしまう)。
-  var SYNC_FIELDS = ["tasks", "reviews", "pomodoroLog", "counter", "timerSettings", "updatedAt"];
+  var SYNC_FIELDS = ["tasks", "reviews", "pomodoroLog", "counter", "timerSettings", "updatedAt", "pendingGoogleDeletes"];
   function syncPayload() {
     var payload = {};
     SYNC_FIELDS.forEach(function (k) { payload[k] = state[k]; });
@@ -1736,7 +1741,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608140926").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608150845").catch(function () {});
     });
   }
 </script>
