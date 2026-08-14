@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608140915">
-<link rel="icon" href="icon-192.png?v=202608140915">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608140915">
+<link rel="manifest" href="manifest.json?v=202608140926">
+<link rel="icon" href="icon-192.png?v=202608140926">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608140926">
 <style>
   :root {
     --ink: #1C2321;
@@ -291,7 +291,15 @@
   .pomo-dots { font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; color: var(--amber); }
 
   /* ---------- Calendar ---------- */
-  .cal-nav { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .cal-nav { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .cal-mode-tabs { display: flex; gap: 3px; margin-left: auto; }
+  .cal-mode-btn {
+    border: 1px solid var(--line); background: var(--paper-raised); color: var(--ink-soft);
+    padding: 5px 12px; border-radius: 3px; font-size: 12.5px; cursor: pointer; font-weight: 600;
+  }
+  .cal-mode-btn:hover { background: var(--paper-sunken); color: var(--ink); }
+  .cal-mode-btn.active { background: var(--accent); border-color: var(--accent); color: var(--paper-raised); }
+  .cal-cell-tall { min-height: 220px; }
   .cal-nav-btn {
     border: 1px solid var(--line); background: var(--paper-raised); width: 30px; height: 30px; border-radius: 3px;
     cursor: pointer; color: var(--ink-soft); font-family: var(--font-mono); font-size: 14px;
@@ -572,7 +580,8 @@
     return {
       counter: 7,
       activeView: "inbox",
-      calCursor: { year: new Date().getFullYear(), month: new Date().getMonth() },
+      calCursor: { year: new Date().getFullYear(), month: new Date().getMonth(), day: new Date().getDate() },
+      calMode: "month",
       tasks: [
         { id: 1, no: "No.001", title: "牡蠣の積み込みプランを来週分アップデート", note: "女川発/仙台発ルートの順番を再確認する", createdAt: now - day * 3, triaged: true, urgent: true, important: true, status: "doing", estPomodoros: 3, donePomodoros: 2, completedAt: null, dueDate: todayKey(new Date(now + day)), dueTime: "17:00", reminderMin: 30, notifiedAt: null, repeat: null },
         { id: 2, no: "No.002", title: "タスクカレンダーのGoogle連携 Phase2を設計", note: "Phase1完了分の反省を踏まえて構成を練る", createdAt: now - day * 2, triaged: true, urgent: false, important: true, status: "todo", estPomodoros: 4, donePomodoros: 0, completedAt: null, dueDate: todayKey(new Date(now + day * 10)), dueTime: null, reminderMin: null, notifiedAt: null, repeat: null },
@@ -606,6 +615,8 @@
       var parsed = JSON.parse(raw);
       if (parsed.timer) parsed.timer.running = false;
       if (!parsed.calCursor) parsed.calCursor = { year: new Date().getFullYear(), month: new Date().getMonth() };
+      if (!("day" in parsed.calCursor)) parsed.calCursor.day = new Date().getDate();
+      if (!parsed.calMode) parsed.calMode = "month";
       if (!("updatedAt" in parsed)) parsed.updatedAt = 0;
       (parsed.tasks || []).forEach(function (t) {
         if (!("dueDate" in t)) t.dueDate = null;
@@ -1276,31 +1287,53 @@
     return html;
   }
 
-  function renderCalendar() {
-    var cur = state.calCursor;
-    var year = cur.year, month = cur.month;
+  var CAL_WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
+  function calRefDate() {
+    var c = state.calCursor;
+    return new Date(c.year, c.month, c.day || 1);
+  }
+  function setCalRefDate(d) {
+    state.calCursor = { year: d.getFullYear(), month: d.getMonth(), day: d.getDate() };
+  }
+  function calByDateMap() {
+    var byDate = {};
+    state.tasks.filter(function (t) { return t.triaged && t.dueDate; }).forEach(function (t) {
+      (byDate[t.dueDate] = byDate[t.dueDate] || []).push(t);
+    });
+    return byDate;
+  }
+  function calChipHtml(t) {
+    var cls = isOverdue(t) ? "overdue" : "q" + quadrantOf(t);
+    var timeLabel = t.dueTime ? " " + t.dueTime : "";
+    return '<span class="cal-chip ' + cls + (t.status === "done" ? " done" : "") + '" title="' + escapeHtml(t.no + " " + t.title + timeLabel) + '">' +
+      (t.dueTime ? '<span class="cal-chip-time">' + t.dueTime + '</span> ' : "") + escapeHtml(t.title) + '</span>';
+  }
+  function calNavLabel() {
+    var d = calRefDate();
+    if (state.calMode === "month") return d.getFullYear() + "年 " + (d.getMonth() + 1) + "月";
+    if (state.calMode === "day") return d.getFullYear() + "年 " + (d.getMonth() + 1) + "月" + d.getDate() + "日(" + CAL_WEEKDAY_LABELS[d.getDay()] + ")";
+    var sunday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay());
+    var saturday = new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate() + 6);
+    var fmt = function (dt) { return (dt.getMonth() + 1) + "/" + dt.getDate(); };
+    return sunday.getFullYear() + "年 " + fmt(sunday) + "〜" + fmt(saturday);
+  }
+  function calModeTabsHtml() {
+    var modes = [{ v: "month", label: "月" }, { v: "week", label: "週" }, { v: "day", label: "日" }];
+    return '<span class="cal-mode-tabs">' + modes.map(function (m) {
+      return '<button class="cal-mode-btn' + (state.calMode === m.v ? " active" : "") + '" data-cal-mode="' + m.v + '">' + m.label + '</button>';
+    }).join("") + '</span>';
+  }
+  function calMonthGridHtml() {
+    var c = state.calCursor, year = c.year, month = c.month;
     var startWeekday = new Date(year, month, 1).getDay();
     var daysInMonth = new Date(year, month + 1, 0).getDate();
     var todayStr = todayKey();
     var gridStart = new Date(year, month, 1 - startWeekday);
     var totalCells = Math.ceil((startWeekday + daysInMonth) / 7) * 7;
+    var byDate = calByDateMap();
 
-    var byDate = {};
-    state.tasks.filter(function (t) { return t.triaged && t.dueDate; }).forEach(function (t) {
-      (byDate[t.dueDate] = byDate[t.dueDate] || []).push(t);
-    });
-
-    var html = viewHead("03 · TIME-BOXING", "カレンダー", "チケットに日付と時刻の期限を置く。通知を設定すれば、指定した分前(または期限ちょうど)にこの卓上から知らせる。");
-    html += '<div class="cal-nav">' +
-      '<button class="cal-nav-btn" id="calPrev" aria-label="前の月">‹</button>' +
-      '<span class="cal-month">' + year + '年 ' + (month + 1) + '月</span>' +
-      '<button class="cal-nav-btn" id="calNext" aria-label="次の月">›</button>' +
-      '<button class="btn btn-sm cal-today-btn" id="calToday">今日</button>' +
-      '</div>';
-
-    var weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"];
-    html += '<div class="cal-grid">';
-    weekdayLabels.forEach(function (w, i) {
+    var html = '<div class="cal-grid">';
+    CAL_WEEKDAY_LABELS.forEach(function (w, i) {
       html += '<div class="cal-weekday' + (i === 0 ? " sun" : i === 6 ? " sat" : "") + '">' + w + '</div>';
     });
     for (var i = 0; i < totalCells; i++) {
@@ -1311,15 +1344,67 @@
       html += '<div class="cal-cell' + (inMonth ? "" : " out") + (dKey === todayStr ? " is-today" : "") + '">' +
         '<span class="cal-daynum">' + d.getDate() + '</span>';
       var shown = items.slice(0, 3);
-      shown.forEach(function (t) {
-        var cls = isOverdue(t) ? "overdue" : "q" + quadrantOf(t);
-        var timeLabel = t.dueTime ? " " + t.dueTime : "";
-        html += '<span class="cal-chip ' + cls + (t.status === "done" ? " done" : "") + '" title="' + escapeHtml(t.no + " " + t.title + timeLabel) + '">' + (t.dueTime ? '<span class="cal-chip-time">' + t.dueTime + '</span> ' : "") + escapeHtml(t.title) + '</span>';
-      });
+      shown.forEach(function (t) { html += calChipHtml(t); });
       if (items.length > shown.length) html += '<span class="cal-more">+' + (items.length - shown.length) + '件</span>';
       html += '</div>';
     }
     html += '</div>';
+    return html;
+  }
+  function calWeekRowHtml() {
+    var ref = calRefDate();
+    var sunday = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate() - ref.getDay());
+    var todayStr = todayKey();
+    var byDate = calByDateMap();
+
+    var html = '<div class="cal-grid">';
+    CAL_WEEKDAY_LABELS.forEach(function (w, i) {
+      html += '<div class="cal-weekday' + (i === 0 ? " sun" : i === 6 ? " sat" : "") + '">' + w + '</div>';
+    });
+    for (var i = 0; i < 7; i++) {
+      var d = new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate() + i);
+      var dKey = todayKey(d);
+      var items = byDate[dKey] || [];
+      html += '<div class="cal-cell cal-cell-tall' + (dKey === todayStr ? " is-today" : "") + '">' +
+        '<span class="cal-daynum">' + (d.getMonth() + 1) + '/' + d.getDate() + '</span>';
+      var shown = items.slice(0, 6);
+      shown.forEach(function (t) { html += calChipHtml(t); });
+      if (items.length > shown.length) html += '<span class="cal-more">+' + (items.length - shown.length) + '件</span>';
+      html += '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+  function calDayListHtml() {
+    var ref = calRefDate();
+    var dKey = todayKey(ref);
+    var items = calByDateMap()[dKey] || [];
+    if (!items.length) return '<div class="empty-state">この日に期限のあるチケットはありません。</div>';
+    return items.map(function (t) {
+      var meta = QUAD_META[quadrantOf(t)];
+      return '<div class="ticket status-' + t.status + '"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' +
+        '<span class="pill ' + meta.cls + '">' + meta.title + '</span>' + repeatPillHtml(t) + '</div>' +
+        '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
+        (t.note ? '<p class="ticket-note">' + escapeHtml(t.note) + '</p>' : "") +
+        '<div class="ticket-actions">' + (t.status !== "done" ? '<span class="pomo-dots" title="ポモドーロ進捗">' + pomoDots(t) + '</span>' : "") +
+        ticketDueHtml(t) + '<span class="spacer"></span>' +
+        '<button class="btn btn-sm" data-focus-task="' + t.id + '">集中する</button>' +
+        '<button class="btn-ghost" data-del="' + t.id + '">削除</button></div></div>';
+    }).join("");
+  }
+  function renderCalendar() {
+    var html = viewHead("03 · TIME-BOXING", "カレンダー", "チケットに日付と時刻の期限を置く。通知を設定すれば、指定した分前(または期限ちょうど)にこの卓上から知らせる。");
+    html += '<div class="cal-nav">' +
+      '<button class="cal-nav-btn" id="calPrev" aria-label="前へ">‹</button>' +
+      '<span class="cal-month">' + calNavLabel() + '</span>' +
+      '<button class="cal-nav-btn" id="calNext" aria-label="次へ">›</button>' +
+      '<button class="btn btn-sm cal-today-btn" id="calToday">今日</button>' +
+      calModeTabsHtml() +
+      '</div>';
+
+    if (state.calMode === "week") html += calWeekRowHtml();
+    else if (state.calMode === "day") html += calDayListHtml();
+    else html += calMonthGridHtml();
 
     var unscheduled = state.tasks.filter(function (t) { return t.triaged && !t.dueDate && t.status !== "done"; });
     if (unscheduled.length) {
@@ -1459,11 +1544,21 @@
     return html;
   }
   function stripTime(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
-  function shiftMonth(delta) {
-    var m = state.calCursor.month + delta;
-    var y = state.calCursor.year + Math.floor(m / 12);
-    m = ((m % 12) + 12) % 12;
-    state.calCursor = { year: y, month: m };
+  function shiftCal(delta) {
+    var d = calRefDate();
+    if (state.calMode === "month") {
+      var m = d.getMonth() + delta, y = d.getFullYear() + Math.floor(m / 12);
+      m = ((m % 12) + 12) % 12;
+      setCalRefDate(new Date(y, m, 1));
+    } else if (state.calMode === "week") {
+      setCalRefDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + delta * 7));
+    } else {
+      setCalRefDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + delta));
+    }
+    save(); renderMain();
+  }
+  function setCalMode(mode) {
+    state.calMode = mode;
     save(); renderMain();
   }
 
@@ -1550,11 +1645,14 @@
     var calPrev = document.getElementById("calPrev");
     var calNext = document.getElementById("calNext");
     var calToday = document.getElementById("calToday");
-    if (calPrev) calPrev.addEventListener("click", function () { shiftMonth(-1); });
-    if (calNext) calNext.addEventListener("click", function () { shiftMonth(1); });
+    if (calPrev) calPrev.addEventListener("click", function () { shiftCal(-1); });
+    if (calNext) calNext.addEventListener("click", function () { shiftCal(1); });
     if (calToday) calToday.addEventListener("click", function () {
-      state.calCursor = { year: new Date().getFullYear(), month: new Date().getMonth() };
+      setCalRefDate(new Date());
       save(); renderMain();
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-cal-mode]"), function (btn) {
+      btn.addEventListener("click", function () { setCalMode(btn.dataset.calMode); });
     });
 
     // Kanban drag & drop
@@ -1638,7 +1736,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608140915").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608140926").catch(function () {});
     });
   }
 </script>

@@ -1,7 +1,7 @@
 // タスクデスク Service Worker — app-shell caching for offline / installed-app use.
 // Bump CACHE_NAME on every deploy (same timestamp pattern as index.html's ?v= query strings)
 // so returning clients pick up the new version instead of a stale cached shell.
-const CACHE_NAME = "taskdesk-shell-202608140915";
+const CACHE_NAME = "taskdesk-shell-202608140926";
 const CORE_ASSETS = [
   "./",
   "./index.html",
