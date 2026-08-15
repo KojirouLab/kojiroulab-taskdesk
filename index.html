@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608150845">
-<link rel="icon" href="icon-192.png?v=202608150845">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608150845">
+<link rel="manifest" href="manifest.json?v=202608152215">
+<link rel="icon" href="icon-192.png?v=202608152215">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608152215">
 <style>
   :root {
     --ink: #1C2321;
@@ -338,10 +338,69 @@
   .unscheduled-title { font-size: 12px; font-weight: 700; color: var(--ink-soft); letter-spacing: .04em; margin-bottom: 10px; text-transform: uppercase; }
   .unscheduled-row {
     display: flex; align-items: center; gap: 10px; background: var(--paper-raised); border: 1px solid var(--line);
-    border-radius: 4px; padding: 9px 12px; margin-bottom: 6px;
+    border-radius: 4px; padding: 9px 12px; margin-bottom: 6px; cursor: pointer;
   }
+  .unscheduled-row:hover { background: var(--paper-sunken); }
   .unscheduled-row .ticket-no { flex-shrink: 0; }
   .unscheduled-row .ticket-title-inline { flex: 1; font-size: 13px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* クリックしてチケットを編集できる箇所(カレンダーのチップ・行・日表示カード)の共通の見た目 */
+  button.cal-chip { border: none; width: 100%; text-align: left; font: inherit; cursor: pointer; }
+  button.cal-chip:hover { filter: brightness(0.93); }
+  @media (prefers-color-scheme: dark) { button.cal-chip:hover { filter: brightness(1.15); } }
+  :root[data-theme="dark"] button.cal-chip:hover { filter: brightness(1.15); }
+  .cal-day-ticket { cursor: pointer; }
+  .cal-day-ticket:hover { border-color: var(--accent); }
+
+  /* ---------- Edit modal ---------- */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(20, 22, 20, 0.5); z-index: 200;
+    display: flex; align-items: center; justify-content: center; padding: 18px;
+  }
+  .modal-overlay[hidden] { display: none; }
+  .modal {
+    background: var(--paper-raised); border: 1px solid var(--line); border-radius: 6px;
+    box-shadow: 0 16px 44px var(--shadow); width: 100%; max-width: 460px; max-height: 90vh;
+    overflow-y: auto; padding: 18px 20px 20px;
+  }
+  .modal-head {
+    display: flex; align-items: flex-start; gap: 10px; margin-bottom: 16px; padding-bottom: 12px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .modal-title-group { flex: 1; min-width: 0; }
+  .modal-eyebrow {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); letter-spacing: .04em; margin-bottom: 7px;
+  }
+  .modal-title-input {
+    width: 100%; background: var(--paper); border: 1px solid var(--line); border-radius: 3px;
+    padding: 8px 10px; font-size: 15px; font-weight: 600; color: var(--ink);
+  }
+  .modal-close {
+    background: none; border: none; font-size: 22px; line-height: 1; color: var(--ink-soft);
+    cursor: pointer; padding: 2px 4px; flex-shrink: 0;
+  }
+  .modal-close:hover { color: var(--warn); }
+  .modal-field { margin-bottom: 15px; }
+  .modal-field > label {
+    display: block; font-size: 11px; font-weight: 700; color: var(--ink-soft);
+    letter-spacing: .04em; margin-bottom: 6px;
+  }
+  .modal-field textarea {
+    width: 100%; min-height: 58px; resize: vertical; background: var(--paper); border: 1px solid var(--line);
+    border-radius: 3px; padding: 8px 10px; color: var(--ink);
+  }
+  .modal-status-group { display: flex; gap: 6px; }
+  .modal-status-btn {
+    flex: 1; border: 1px solid var(--line); background: var(--paper); color: var(--ink-soft);
+    border-radius: 3px; padding: 8px 6px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  }
+  .modal-status-btn:hover { background: var(--paper-sunken); }
+  .modal-status-btn.active { background: var(--accent); border-color: var(--accent); color: var(--paper-raised); }
+  .modal-actions {
+    display: flex; align-items: center; gap: 8px; margin-top: 18px; padding-top: 14px;
+    border-top: 1px dashed var(--line);
+  }
 
   /* ---------- Focus / Pomodoro ---------- */
   .focus-wrap { display: grid; grid-template-columns: 1.1fr .9fr; gap: 26px; align-items: start; }
@@ -444,6 +503,7 @@
   <main id="main"></main>
 </div>
 <div class="toast-stack" id="toastStack"></div>
+<div class="modal-overlay" id="editModalOverlay" hidden></div>
 
 <script>
 (function () {
@@ -782,6 +842,15 @@
     if (t.reminderMin != null) ensureNotifyPermission();
     deferRender();
   }
+  // 時・分の2つのselectから1本のdueTimeを組み立てる。同じ内容の入力欄が同時に2箇所
+  // (例: 日表示のチケットカードと編集モーダル)に存在しうるため、要素は呼び出し側が
+  // スコープを絞って渡す(どちらの入力欄を読むべきか一意に決まるように)。
+  function applyHourMinFor(id, hourEl, minEl) {
+    if (!hourEl || !minEl) return;
+    if (!hourEl.value && !minEl.value) { setDueTime(id, null); return; } // 両方未設定の時だけクリア扱い
+    // 片方だけ選んだ場合は、もう片方を00として仮確定する(選んだ方が再描画で消えないように)。
+    setDueTime(id, (hourEl.value || "00") + ":" + (minEl.value || "00"));
+  }
 
   function quadrantOf(t) {
     if (t.urgent && t.important) return 1;
@@ -948,8 +1017,10 @@
   var pendingRender = false;
   function mainEditingActive() {
     var el = document.activeElement;
+    if (!el || (el.tagName !== "INPUT" && el.tagName !== "SELECT" && el.tagName !== "TEXTAREA")) return false;
     var main = document.getElementById("main");
-    return !!(el && main && main.contains(el) && (el.tagName === "INPUT" || el.tagName === "SELECT" || el.tagName === "TEXTAREA"));
+    var modal = document.getElementById("editModalOverlay");
+    return !!((main && main.contains(el)) || (modal && modal.contains(el)));
   }
   function renderOrDefer() {
     if (mainEditingActive()) { pendingRender = true; return; }
@@ -1310,8 +1381,8 @@
   function calChipHtml(t) {
     var cls = isOverdue(t) ? "overdue" : "q" + quadrantOf(t);
     var timeLabel = t.dueTime ? " " + t.dueTime : "";
-    return '<span class="cal-chip ' + cls + (t.status === "done" ? " done" : "") + '" title="' + escapeHtml(t.no + " " + t.title + timeLabel) + '">' +
-      (t.dueTime ? '<span class="cal-chip-time">' + t.dueTime + '</span> ' : "") + escapeHtml(t.title) + '</span>';
+    return '<button type="button" class="cal-chip ' + cls + (t.status === "done" ? " done" : "") + '" data-cal-edit="' + t.id + '" title="' + escapeHtml(t.no + " " + t.title + timeLabel) + '">' +
+      (t.dueTime ? '<span class="cal-chip-time">' + t.dueTime + '</span> ' : "") + escapeHtml(t.title) + '</button>';
   }
   function calNavLabel() {
     var d = calRefDate();
@@ -1387,7 +1458,7 @@
     if (!items.length) return '<div class="empty-state">この日に期限のあるチケットはありません。</div>';
     return items.map(function (t) {
       var meta = QUAD_META[quadrantOf(t)];
-      return '<div class="ticket status-' + t.status + '"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' +
+      return '<div class="ticket cal-day-ticket status-' + t.status + '" data-cal-edit="' + t.id + '"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' +
         '<span class="pill ' + meta.cls + '">' + meta.title + '</span>' + repeatPillHtml(t) + '</div>' +
         '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
         (t.note ? '<p class="ticket-note">' + escapeHtml(t.note) + '</p>' : "") +
@@ -1415,7 +1486,7 @@
     if (unscheduled.length) {
       html += '<div class="unscheduled"><div class="unscheduled-title">期限未定のチケット</div>';
       unscheduled.forEach(function (t) {
-        html += '<div class="unscheduled-row"><span class="ticket-no">' + t.no + '</span>' +
+        html += '<div class="unscheduled-row" data-cal-edit="' + t.id + '"><span class="ticket-no">' + t.no + '</span>' +
           '<span class="ticket-title-inline">' + escapeHtml(t.title) + '</span>' + ticketDueHtml(t) + '</div>';
       });
       html += '</div>';
@@ -1591,6 +1662,9 @@
   /* ---------------- Event binding ---------------- */
   var dragId = null;
   function bindMainEvents() {
+    // #main の中だけを対象にする(編集モーダルは#mainの外にあり、同じdata属性を持つ
+    // 要素が同時に存在しうるため、documentワイドに検索すると二重束縛してしまう)。
+    var main = document.getElementById("main");
     var form = document.getElementById("captureForm");
     if (form) {
       form.addEventListener("submit", function (e) {
@@ -1601,48 +1675,43 @@
         input.focus();
       });
     }
-    Array.prototype.forEach.call(document.querySelectorAll("[data-flag]"), function (btn) {
+    Array.prototype.forEach.call(main.querySelectorAll("[data-flag]"), function (btn) {
       btn.addEventListener("click", function () { toggleFlag(Number(btn.dataset.id), btn.dataset.flag); });
     });
-    Array.prototype.forEach.call(document.querySelectorAll("[data-send]"), function (btn) {
+    Array.prototype.forEach.call(main.querySelectorAll("[data-send]"), function (btn) {
       btn.addEventListener("click", function () { sendToBoard(Number(btn.dataset.send)); });
     });
-    Array.prototype.forEach.call(document.querySelectorAll("[data-del]"), function (btn) {
+    Array.prototype.forEach.call(main.querySelectorAll("[data-del]"), function (btn) {
       btn.addEventListener("click", function () { deleteTask(Number(btn.dataset.del)); });
     });
-    Array.prototype.forEach.call(document.querySelectorAll("[data-move]"), function (btn) {
+    Array.prototype.forEach.call(main.querySelectorAll("[data-move]"), function (btn) {
       btn.addEventListener("click", function () { moveStatus(Number(btn.dataset.id), Number(btn.dataset.move)); });
     });
-    Array.prototype.forEach.call(document.querySelectorAll("[data-focus-task]"), function (btn) {
+    Array.prototype.forEach.call(main.querySelectorAll("[data-focus-task]"), function (btn) {
       btn.addEventListener("click", function () {
         state.timer.taskId = Number(btn.dataset.focusTask);
         switchView("focus");
       });
     });
-    Array.prototype.forEach.call(document.querySelectorAll("[data-due-date]"), function (input) {
+    Array.prototype.forEach.call(main.querySelectorAll("[data-due-date]"), function (input) {
       input.addEventListener("change", function () { setDueDate(Number(input.dataset.dueDate), input.value); });
     });
     function applyHourMin(id) {
-      var h = document.querySelector('[data-due-hour="' + id + '"]');
-      var m = document.querySelector('[data-due-min="' + id + '"]');
-      if (!h || !m) return;
-      if (!h.value && !m.value) { setDueTime(id, null); return; } // 両方未設定の時だけクリア扱い
-      // 片方だけ選んだ場合は、もう片方を00として仮確定する(選んだ方が再描画で消えないように)。
-      setDueTime(id, (h.value || "00") + ":" + (m.value || "00"));
+      applyHourMinFor(id, main.querySelector('[data-due-hour="' + id + '"]'), main.querySelector('[data-due-min="' + id + '"]'));
     }
-    Array.prototype.forEach.call(document.querySelectorAll("[data-due-hour]"), function (sel) {
+    Array.prototype.forEach.call(main.querySelectorAll("[data-due-hour]"), function (sel) {
       sel.addEventListener("change", function () { applyHourMin(Number(sel.dataset.dueHour)); });
     });
-    Array.prototype.forEach.call(document.querySelectorAll("[data-due-min]"), function (sel) {
+    Array.prototype.forEach.call(main.querySelectorAll("[data-due-min]"), function (sel) {
       sel.addEventListener("change", function () { applyHourMin(Number(sel.dataset.dueMin)); });
     });
-    Array.prototype.forEach.call(document.querySelectorAll("[data-due-time-clear]"), function (btn) {
+    Array.prototype.forEach.call(main.querySelectorAll("[data-due-time-clear]"), function (btn) {
       btn.addEventListener("click", function () { setDueTime(Number(btn.dataset.dueTimeClear), null); });
     });
-    Array.prototype.forEach.call(document.querySelectorAll("[data-due-remind]"), function (sel) {
+    Array.prototype.forEach.call(main.querySelectorAll("[data-due-remind]"), function (sel) {
       sel.addEventListener("change", function () { setReminder(Number(sel.dataset.dueRemind), sel.value); });
     });
-    Array.prototype.forEach.call(document.querySelectorAll("[data-repeat]"), function (sel) {
+    Array.prototype.forEach.call(main.querySelectorAll("[data-repeat]"), function (sel) {
       sel.addEventListener("change", function () { setRepeat(Number(sel.dataset.repeat), sel.value); });
     });
 
@@ -1656,19 +1725,28 @@
       setCalRefDate(new Date());
       save(); renderMain();
     });
-    Array.prototype.forEach.call(document.querySelectorAll("[data-cal-mode]"), function (btn) {
+    Array.prototype.forEach.call(main.querySelectorAll("[data-cal-mode]"), function (btn) {
       btn.addEventListener("click", function () { setCalMode(btn.dataset.calMode); });
+    });
+    // カレンダーのチップ/行/カードをクリックすると編集モーダルを開く。
+    // ただしチップ自体(<button>)以外は内部に期限入力などの操作要素を含むので、
+    // それらのクリックはモーダルを開かず素通しする。
+    Array.prototype.forEach.call(main.querySelectorAll("[data-cal-edit]"), function (el) {
+      el.addEventListener("click", function (e) {
+        if (el.tagName !== "BUTTON" && e.target.closest("input, select, button, label, textarea")) return;
+        openEditModal(Number(el.dataset.calEdit));
+      });
     });
 
     // Kanban drag & drop
-    Array.prototype.forEach.call(document.querySelectorAll("[data-drag]"), function (card) {
+    Array.prototype.forEach.call(main.querySelectorAll("[data-drag]"), function (card) {
       card.addEventListener("dragstart", function () {
         dragId = Number(card.dataset.drag);
         card.classList.add("dragging");
       });
       card.addEventListener("dragend", function () { card.classList.remove("dragging"); });
     });
-    Array.prototype.forEach.call(document.querySelectorAll("[data-col]"), function (col) {
+    Array.prototype.forEach.call(main.querySelectorAll("[data-col]"), function (col) {
       col.addEventListener("dragover", function (e) { e.preventDefault(); col.classList.add("drag-over"); });
       col.addEventListener("dragleave", function () { col.classList.remove("drag-over"); });
       col.addEventListener("drop", function (e) {
@@ -1701,12 +1779,137 @@
     });
 
     // Review view
-    Array.prototype.forEach.call(document.querySelectorAll("[data-review-field]"), function (ta) {
+    Array.prototype.forEach.call(main.querySelectorAll("[data-review-field]"), function (ta) {
       ta.addEventListener("input", function () {
         var wk = weekInfo(new Date());
         getReview(wk.key)[ta.dataset.reviewField] = ta.value;
         save();
       });
+    });
+  }
+
+  /* ---------------- Edit modal(カレンダーからのクリック編集) ---------------- */
+  // #main の外(bodyの直下)にあるオーバーレイなので、render()でrail/#mainを
+  // 作り直しても影響を受けない。開閉と再描画は編集対象のIDだけで管理する。
+  var editingTaskId = null;
+  function openEditModal(id) {
+    if (!findTask(id)) return;
+    editingTaskId = id;
+    renderEditModal();
+  }
+  function closeEditModal() {
+    editingTaskId = null;
+    renderEditModal();
+  }
+  function deferRenderModal() { setTimeout(renderEditModal, 0); }
+
+  function renderEditModal() {
+    var overlay = document.getElementById("editModalOverlay");
+    if (!overlay) return;
+    var t = editingTaskId != null ? findTask(editingTaskId) : null;
+    if (!t) {
+      overlay.hidden = true;
+      overlay.innerHTML = "";
+      return;
+    }
+    overlay.hidden = false;
+    var meta = QUAD_META[quadrantOf(t)];
+    var html = '<div class="modal" id="editModal" role="dialog" aria-modal="true" aria-label="チケットを編集">';
+    html += '<div class="modal-head"><div class="modal-title-group">' +
+      '<div class="modal-eyebrow"><span>' + t.no + '</span>' +
+      (t.triaged ? '<span class="pill ' + meta.cls + '">' + meta.title + '</span>' : '<span class="pill pill-muted">未仕分け</span>') +
+      repeatPillHtml(t) + '</div>' +
+      '<input type="text" class="modal-title-input" id="modalTitleInput" value="' + escapeHtml(t.title) + '" placeholder="タイトル"></div>' +
+      '<button type="button" class="modal-close" id="modalCloseBtn" aria-label="閉じる">×</button></div>';
+
+    html += '<div class="modal-field"><label>メモ</label><textarea id="modalNoteInput" placeholder="メモ（任意）">' + escapeHtml(t.note || "") + '</textarea></div>';
+
+    html += '<div class="modal-field"><label>分類</label>' + ticketFlagsHtml(t) + '</div>';
+
+    if (t.triaged) {
+      html += '<div class="modal-field"><label>状態</label><div class="modal-status-group">' +
+        [["todo", "未着手"], ["doing", "進行中"], ["done", "完了"]].map(function (s) {
+          return '<button type="button" class="modal-status-btn' + (t.status === s[0] ? " active" : "") + '" data-modal-status="' + s[0] + '">' + s[1] + '</button>';
+        }).join("") + '</div></div>';
+    }
+
+    html += '<div class="modal-field"><label>期限</label>' + ticketDueHtml(t) + '</div>';
+
+    html += '<div class="modal-actions">';
+    if (t.triaged) {
+      if (t.status !== "done") html += '<button type="button" class="btn btn-sm" id="modalFocusBtn">集中する</button>';
+    } else {
+      html += '<button type="button" class="btn btn-sm btn-primary" id="modalSendBtn">ボードへ送る →</button>';
+    }
+    html += '<span class="spacer"></span><button type="button" class="btn-ghost" id="modalDeleteBtn">削除</button></div>';
+    html += '</div>';
+
+    overlay.innerHTML = html;
+    bindModalEvents(overlay, t.id);
+  }
+
+  function bindModalEvents(overlay, id) {
+    var closeBtn = overlay.querySelector("#modalCloseBtn");
+    if (closeBtn) closeBtn.addEventListener("click", closeEditModal);
+
+    var titleInput = overlay.querySelector("#modalTitleInput");
+    if (titleInput) {
+      titleInput.addEventListener("input", function () {
+        var t = findTask(id); if (!t) return;
+        t.title = titleInput.value; touch(t); save();
+      });
+    }
+    var noteInput = overlay.querySelector("#modalNoteInput");
+    if (noteInput) {
+      noteInput.addEventListener("input", function () {
+        var t = findTask(id); if (!t) return;
+        t.note = noteInput.value; touch(t); save();
+      });
+    }
+
+    Array.prototype.forEach.call(overlay.querySelectorAll("[data-flag]"), function (btn) {
+      btn.addEventListener("click", function () { toggleFlag(Number(btn.dataset.id), btn.dataset.flag); renderEditModal(); });
+    });
+    Array.prototype.forEach.call(overlay.querySelectorAll("[data-modal-status]"), function (btn) {
+      btn.addEventListener("click", function () { setStatus(id, btn.dataset.modalStatus); renderEditModal(); });
+    });
+    Array.prototype.forEach.call(overlay.querySelectorAll("[data-due-date]"), function (input) {
+      input.addEventListener("change", function () { setDueDate(Number(input.dataset.dueDate), input.value); deferRenderModal(); });
+    });
+    function applyModalHourMin(hmId) {
+      applyHourMinFor(hmId, overlay.querySelector('[data-due-hour="' + hmId + '"]'), overlay.querySelector('[data-due-min="' + hmId + '"]'));
+      deferRenderModal();
+    }
+    Array.prototype.forEach.call(overlay.querySelectorAll("[data-due-hour]"), function (sel) {
+      sel.addEventListener("change", function () { applyModalHourMin(Number(sel.dataset.dueHour)); });
+    });
+    Array.prototype.forEach.call(overlay.querySelectorAll("[data-due-min]"), function (sel) {
+      sel.addEventListener("change", function () { applyModalHourMin(Number(sel.dataset.dueMin)); });
+    });
+    Array.prototype.forEach.call(overlay.querySelectorAll("[data-due-time-clear]"), function (btn) {
+      btn.addEventListener("click", function () { setDueTime(Number(btn.dataset.dueTimeClear), null); renderEditModal(); });
+    });
+    Array.prototype.forEach.call(overlay.querySelectorAll("[data-due-remind]"), function (sel) {
+      sel.addEventListener("change", function () { setReminder(Number(sel.dataset.dueRemind), sel.value); deferRenderModal(); });
+    });
+    Array.prototype.forEach.call(overlay.querySelectorAll("[data-repeat]"), function (sel) {
+      sel.addEventListener("change", function () { setRepeat(Number(sel.dataset.repeat), sel.value); deferRenderModal(); });
+    });
+
+    var sendBtn = overlay.querySelector("#modalSendBtn");
+    if (sendBtn) sendBtn.addEventListener("click", function () { sendToBoard(id); renderEditModal(); });
+
+    var focusBtn = overlay.querySelector("#modalFocusBtn");
+    if (focusBtn) focusBtn.addEventListener("click", function () {
+      state.timer.taskId = id;
+      closeEditModal();
+      switchView("focus");
+    });
+
+    var delBtn = overlay.querySelector("#modalDeleteBtn");
+    if (delBtn) delBtn.addEventListener("click", function () {
+      deleteTask(id);
+      closeEditModal();
     });
   }
 
@@ -1731,6 +1934,24 @@
     }, 300);
   });
 
+  // 編集モーダル: 背景クリック/Escapeで閉じる。フォーカスが外れたら、モーダル内で
+  // 直接書き換えたタイトル/メモを#main側(カレンダーのチップ等)にも反映する。
+  var editModalOverlayEl = document.getElementById("editModalOverlay");
+  editModalOverlayEl.addEventListener("click", function (e) {
+    if (e.target === editModalOverlayEl) closeEditModal();
+  });
+  editModalOverlayEl.addEventListener("focusout", function () {
+    setTimeout(function () {
+      if (!mainEditingActive()) {
+        pendingRender = false;
+        if (editingTaskId != null) render();
+      }
+    }, 300);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && editingTaskId != null) closeEditModal();
+  });
+
   handleGoogleRedirectParams();
   if (googleState.status === "checking") triggerGoogleSync();
   setInterval(function () {
@@ -1741,7 +1962,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608150845").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608152215").catch(function () {});
     });
   }
 </script>
