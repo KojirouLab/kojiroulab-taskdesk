@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608162124">
-<link rel="icon" href="icon-192.png?v=202608162124">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608162124">
+<link rel="manifest" href="manifest.json?v=202608162134">
+<link rel="icon" href="icon-192.png?v=202608162134">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608162134">
 <style>
   :root {
     --ink: #1C2321;
@@ -88,6 +88,7 @@
     background: var(--paper); color: var(--ink);
     font-family: var(--font-jp);
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden; /* 何かの拍子に内側が幅をはみ出しても、ページ全体が横スクロールしないための保険 */
   }
   body { font-size: 18.5px; line-height: 1.6; }
   button, input, textarea, select { font-family: inherit; font-size: inherit; color: inherit; }
@@ -103,6 +104,8 @@
     display: flex; flex-direction: column;
     padding: 22px 16px; gap: 22px;
     position: sticky; top: 0; height: 100vh; overflow-y: auto;
+    min-width: 0; /* グリッド項目は既定でcontentのmin-content分の幅を確保しようとするため、
+                     rail内側(横並びナビ等)が狭い画面ではみ出す原因になる。明示的に解除する。 */
   }
   .brand { display: flex; flex-direction: column; gap: 4px; padding: 0 4px; }
   .brand-mark { font-family: var(--font-mono); font-size: 14.5px; letter-spacing: .12em; color: var(--amber); }
@@ -183,7 +186,7 @@
   @keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 
   /* ---------- Main ---------- */
-  main { padding: 30px 40px 60px; }
+  main { padding: 30px 40px 60px; min-width: 0; }
   .view-head { margin-bottom: 22px; }
   .view-eyebrow { font-family: var(--font-mono); font-size: 14.5px; letter-spacing: .14em; color: var(--amber); margin-bottom: 6px; }
   .view-title { font-size: 27px; font-weight: 700; text-wrap: balance; margin: 0 0 6px; }
@@ -307,14 +310,16 @@
   .cal-nav-btn:hover { background: var(--paper-sunken); color: var(--ink); }
   .cal-month { font-weight: 700; font-size: 19px; font-variant-numeric: tabular-nums; min-width: 9ch; }
   .cal-today-btn { margin-left: 2px; }
-  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+  /* minmax(0, 1fr)必須: ただの1fr(=minmax(auto,1fr))だと、white-space:nowrapな.cal-chipの
+     文字の長さがトラックの最小幅を押し広げ、グリッド全体が画面外にはみ出してしまう。 */
+  .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
   .cal-weekday {
     background: var(--paper-sunken); text-align: center; font-size: 14.5px; font-weight: 700; color: var(--ink-soft);
     padding: 7px 0; letter-spacing: .04em;
   }
   .cal-weekday.sun { color: var(--warn); }
   .cal-weekday.sat { color: var(--info); }
-  .cal-cell { background: var(--paper-raised); min-height: 104px; padding: 7px 7px 9px; display: flex; flex-direction: column; gap: 5px; }
+  .cal-cell { background: var(--paper-raised); min-height: 104px; min-width: 0; padding: 7px 7px 9px; display: flex; flex-direction: column; gap: 5px; }
   .cal-cell.out { background: var(--paper-sunken); }
   .cal-cell.out .cal-daynum { color: var(--ink-faint); }
   .cal-daynum { font-family: var(--font-mono); font-size: 15px; color: var(--ink-soft); }
@@ -461,8 +466,15 @@
     .app { grid-template-columns: 1fr; }
     .rail { position: static; height: auto; flex-direction: row; align-items: center; overflow-x: auto; padding: 12px 14px; }
     .brand { display: none; }
-    .rail-nav { flex-direction: row; }
-    .nav-text { display: none; }
+    .rail-nav { flex-direction: row; gap: 4px; }
+    /* 横並びでも「01」「17」だけの数字表示だと何のことか分からないため、番号は隠して
+       ラベルは残す(英語のサブラベルだけ省略して幅を節約)。入りきらなければ.railの
+       overflow-x:autoで横スクロールさせる(切り詰めて読めなくするより良い)。 */
+    .nav-item { flex-direction: column; width: auto; flex-shrink: 0; gap: 3px; padding: 7px 12px; }
+    .nav-num { display: none; }
+    .nav-text { display: flex; flex-direction: column; align-items: center; }
+    .nav-en { display: none; }
+    .nav-jp { font-size: 12.5px; white-space: nowrap; }
     .nav-loop { display: none; }
     .rail-meta {
       display: flex; flex-direction: column; gap: 4px; margin-left: 10px; padding-left: 10px;
@@ -1967,7 +1979,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608162124").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608162134").catch(function () {});
     });
   }
 </script>
