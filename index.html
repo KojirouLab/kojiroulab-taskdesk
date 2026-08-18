@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608182219">
-<link rel="icon" href="icon-192.png?v=202608182219">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608182219">
+<link rel="manifest" href="manifest.json?v=202608190837">
+<link rel="icon" href="icon-192.png?v=202608190837">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608190837">
 <style>
   :root {
     --ink: #1C2321;
@@ -1368,7 +1368,9 @@
         html += items.map(function (t) {
           return '<div class="ticket"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' + repeatPillHtml(t) + '</div>' +
             '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
-            '<div class="ticket-actions">' + ticketFlagsHtml(t) + ticketDueHtml(t) + '</div></div>';
+            '<div class="ticket-actions">' + ticketFlagsHtml(t) + ticketDueHtml(t) +
+            '<span class="spacer"></span><button class="btn btn-sm" data-complete="' + t.id + '">完了 ✓</button>' +
+            '</div></div>';
         }).join("");
       }
       html += '</div>';
@@ -1715,6 +1717,9 @@
     Array.prototype.forEach.call(main.querySelectorAll("[data-move]"), function (btn) {
       btn.addEventListener("click", function () { moveStatus(Number(btn.dataset.id), Number(btn.dataset.move)); });
     });
+    Array.prototype.forEach.call(main.querySelectorAll("[data-complete]"), function (btn) {
+      btn.addEventListener("click", function () { setStatus(Number(btn.dataset.complete), "done"); });
+    });
     Array.prototype.forEach.call(main.querySelectorAll("[data-focus-task]"), function (btn) {
       btn.addEventListener("click", function () {
         state.timer.taskId = Number(btn.dataset.focusTask);
@@ -1990,7 +1995,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608182219").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608190837").catch(function () {});
     });
   }
 </script>
