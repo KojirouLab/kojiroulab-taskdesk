@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608162134">
-<link rel="icon" href="icon-192.png?v=202608162134">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608162134">
+<link rel="manifest" href="manifest.json?v=202608182219">
+<link rel="icon" href="icon-192.png?v=202608182219">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608182219">
 <style>
   :root {
     --ink: #1C2321;
@@ -1140,7 +1140,9 @@
     var codeInput = document.getElementById("syncCodeInput");
     if (connectBtn && codeInput) {
       connectBtn.addEventListener("click", function () { connectSync(codeInput.value); });
-      codeInput.addEventListener("keydown", function (e) { if (e.key === "Enter") connectSync(codeInput.value); });
+      codeInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) connectSync(codeInput.value);
+      });
     }
   }
 
@@ -1684,6 +1686,15 @@
     var main = document.getElementById("main");
     var form = document.getElementById("captureForm");
     if (form) {
+      var captureInput = document.getElementById("captureInput");
+      // 日本語入力中に変換を確定するEnterは、ブラウザによってはフォームの送信キーとしても
+      // 扱われてしまい、変換途中の文字ごと起票されてしまう(「たまに日本語入力できなくなる」の原因)。
+      // isComposing中のEnterはここで止めて、IME確定だけで完結させる。
+      if (captureInput) {
+        captureInput.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" && (e.isComposing || e.keyCode === 229)) e.preventDefault();
+        });
+      }
       form.addEventListener("submit", function (e) {
         e.preventDefault();
         var input = document.getElementById("captureInput");
@@ -1979,7 +1990,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608162134").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608182219").catch(function () {});
     });
   }
 </script>
