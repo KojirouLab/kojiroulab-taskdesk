@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>プライバシーポリシー | タスクデスク</title>
+<style>
+  body { max-width: 640px; margin: 0 auto; padding: 32px 20px 80px; font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif; line-height: 1.8; color: #1C2321; background: #ECE8DD; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  h2 { font-size: 16px; margin-top: 32px; }
+  p, li { font-size: 14.5px; }
+  .updated { color: #5B655F; font-size: 12.5px; margin-bottom: 32px; }
+  a { color: #2C6E6B; }
+</style>
+</head>
+<body>
+<h1>タスクデスク プライバシーポリシー</h1>
+<p class="updated">最終更新日: 2026年8月20日</p>
+
+<p>「タスクデスク」(以下「本アプリ」)は、個人のタスク管理を目的とした非商用のツールです。本アプリの開発者・運営者は masa.ikuei@gmail.com です。</p>
+
+<h2>取得する情報</h2>
+<p>本アプリは、利用者が入力したタスクの内容(タイトル・メモ・期限・状態など)を、利用者自身の端末(localStorage)と、複数端末間の同期のために Supabase 上のデータベースに保存します。これらのデータは、利用者が知っている「同期コード」を持つ端末からのみアクセスできます。</p>
+
+<h2>Googleカレンダー連携について</h2>
+<p>利用者が任意でGoogleカレンダー連携を有効にした場合、本アプリは Google アカウントに対して <code>https://www.googleapis.com/auth/calendar</code> の権限を要求します。この権限は、本アプリが利用者専用に作成する「タスクデスク」という名前の単一のカレンダーとの間で、タスクの期限をカレンダーの予定として同期する目的にのみ使用します。利用者の他の既存カレンダーやその他のGoogleデータには一切アクセスしません。</p>
+<p>取得したGoogleの認証情報(リフレッシュトークン)は、同期処理のためだけにサーバー(Supabase)側に保存され、それ以外の目的には使用しません。連携はいつでも本アプリの画面から解除できるほか、<a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Googleアカウントのセキュリティ設定</a>からも取り消せます。</p>
+
+<h2>第三者への提供</h2>
+<p>本アプリが取得した情報を、上記の同期・カレンダー連携以外の目的で第三者に提供・販売することはありません。広告目的での利用も行いません。</p>
+
+<h2>お問い合わせ</h2>
+<p>本ポリシーやデータの取り扱いについてのご質問は masa.ikuei@gmail.com までご連絡ください。</p>
+</body>
+</html>
