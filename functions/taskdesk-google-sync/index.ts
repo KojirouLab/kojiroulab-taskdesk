@@ -23,6 +23,15 @@
 // last reconciliation wins; if only one side changed, that side's version
 // is applied to the other.
 //
+// Optimistic locking on the final write: this function reads taskdesk_state
+// once up front, then makes several (possibly slow) sequential Google
+// Calendar API calls before writing the reconciled tasks back. If a client
+// pushes a local edit to taskdesk_state while this is in flight, writing our
+// stale-based result unconditionally would silently revert that edit. The
+// final update is therefore conditioned on data->>updatedAt still matching
+// what we read at the start; if it doesn't (a local push landed meanwhile),
+// we skip the write entirely and let the next periodic call retry.
+//
 // Deploy via the Supabase Dashboard (Edge Functions > Deploy a new function
 // > Via Editor). Turn OFF "Enforce JWT Verification" - taskdesk has no
 // login, so there's no Supabase Auth JWT to check; the sync code in the
@@ -159,6 +168,7 @@ Deno.serve(async (req) => {
       });
     }
     const data = stateRow.data;
+    const initialUpdatedAt = data.updatedAt; // 書き込み直前の楽観ロックに使う(下記参照)
     const tasks: any[] = Array.isArray(data.tasks) ? data.tasks : [];
     const pendingDeletes: string[] = Array.isArray(data.pendingGoogleDeletes) ? data.pendingGoogleDeletes : [];
 
@@ -248,7 +258,23 @@ Deno.serve(async (req) => {
     }
 
     const newData = { ...data, tasks: nextTasks, counter, updatedAt: now, pendingGoogleDeletes: [] };
-    await sb.from('taskdesk_state').update({ data: newData, updated_at: new Date(now).toISOString() }).eq('id', syncId);
+
+    // 楽観ロック: このリクエストの間(Google APIへの複数回の呼び出しで数秒かかることがある)に、
+    // クライアント側でローカル編集がpushされてtaskdesk_state.data.updatedAtが進んでいたら、
+    // このGoogle同期の結果を書き込まずに諦める(そのローカル編集を丸ごと巻き戻してしまう
+    // 実害があった - 例: 優先度マトリクスで完了にした直後にGoogle同期が走ると、完了が
+    // 巻き戻って見えることがあった)。次の定期同期(90秒後)がその後の状態から再度やり直す。
+    // updatedAtが無い古い形式のデータだけは比較のしようがないので、その場合は
+    // 従来通り無条件に書き込む(でなければ毎回書き込みがスキップされてしまう)。
+    let writeQuery = sb.from('taskdesk_state').update({ data: newData, updated_at: new Date(now).toISOString() }).eq('id', syncId);
+    if (initialUpdatedAt != null) writeQuery = writeQuery.eq('data->>updatedAt', String(initialUpdatedAt));
+    const { data: updatedRows } = await writeQuery.select('id');
+
+    if (!updatedRows || updatedRows.length === 0) {
+      return new Response(JSON.stringify({ connected: true, skipped: 'local change landed during sync, will retry next cycle' }), {
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+    }
 
     return new Response(JSON.stringify({ connected: true, taskCount: nextTasks.length }), {
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },

@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608190837">
-<link rel="icon" href="icon-192.png?v=202608190837">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608190837">
+<link rel="manifest" href="manifest.json?v=202608201005">
+<link rel="icon" href="icon-192.png?v=202608201005">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608201005">
 <style>
   :root {
     --ink: #1C2321;
@@ -1064,7 +1064,13 @@
       return res.json();
     }).then(function (rows) {
       syncState.status = "ok"; syncState.lastSyncedAt = Date.now();
-      if (rows && rows[0] && rows[0].data && (force || rows[0].data.updatedAt > state.updatedAt)) {
+      // ローカルにpush待ち/push中の変更がある間はサーバー側データで上書きしない。
+      // (Googleカレンダー同期のEdge Functionは「読み取り→時間のかかるGoogle API呼び出し→
+      // 丸ごと書き込み」という一括処理をするため、その処理中にローカルで加えた変更
+      // 〈例: マトリクスで完了にした〉を、後から来るこのpullが巻き戻してしまうことがあった。
+      // force(=明示的な接続時)は従来通り必ず相手のデータを採用する。)
+      var localDirty = !force && (syncPushTimer || pushInFlight);
+      if (rows && rows[0] && rows[0].data && (force || (!localDirty && rows[0].data.updatedAt > state.updatedAt))) {
         // force=true(=接続直後)は、タイムスタンプの新旧に関わらず相手のデータを必ず採用する。
         // SYNC_FIELDSだけ取り込む(activeViewなどローカルなUI状態は上書きしない)。
         var incoming = rows[0].data;
@@ -1081,11 +1087,14 @@
     });
   }
   var syncPushTimer = null;
+  var pushInFlight = false; // pullRemote()が、送信中のローカル変更をサーバーの古いデータで上書きしないための目印
   function scheduleSyncPush() {
     clearTimeout(syncPushTimer);
     syncPushTimer = setTimeout(pushRemote, 1500);
   }
   function pushRemote() {
+    syncPushTimer = null;
+    pushInFlight = true;
     var id = getSyncId();
     syncState.status = "busy"; updateSyncStatus();
     return fetch(SUPABASE_URL + "/rest/v1/taskdesk_state?on_conflict=id", {
@@ -1098,6 +1107,8 @@
       updateSyncStatus();
     }).catch(function () {
       syncState.status = "err"; updateSyncStatus();
+    }).then(function () {
+      pushInFlight = false;
     });
   }
   function connectSync(code) {
@@ -1995,7 +2006,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608190837").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608201005").catch(function () {});
     });
   }
 </script>
