@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608201409">
-<link rel="icon" href="icon-192.png?v=202608201409">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608201409">
+<link rel="manifest" href="manifest.json?v=202608201433">
+<link rel="icon" href="icon-192.png?v=202608201433">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608201433">
 <style>
   :root {
     --ink: #1C2321;
@@ -298,37 +298,37 @@
   .cal-mode-tabs { display: flex; gap: 3px; margin-left: auto; }
   .cal-mode-btn {
     border: 1px solid var(--line); background: var(--paper-raised); color: var(--ink-soft);
-    padding: 5px 12px; border-radius: 3px; font-size: 16px; cursor: pointer; font-weight: 600;
+    padding: 5px 12px; border-radius: 3px; font-size: 13.5px; cursor: pointer; font-weight: 600;
   }
   .cal-mode-btn:hover { background: var(--paper-sunken); color: var(--ink); }
   .cal-mode-btn.active { background: var(--accent); border-color: var(--accent); color: var(--paper-raised); }
   .cal-cell-tall { min-height: 220px; }
   .cal-nav-btn {
     border: 1px solid var(--line); background: var(--paper-raised); width: 30px; height: 30px; border-radius: 3px;
-    cursor: pointer; color: var(--ink-soft); font-family: var(--font-mono); font-size: 17.5px;
+    cursor: pointer; color: var(--ink-soft); font-family: var(--font-mono); font-size: 15px;
   }
   .cal-nav-btn:hover { background: var(--paper-sunken); color: var(--ink); }
-  .cal-month { font-weight: 700; font-size: 19px; font-variant-numeric: tabular-nums; min-width: 9ch; }
+  .cal-month { font-weight: 700; font-size: 17px; font-variant-numeric: tabular-nums; min-width: 9ch; }
   .cal-today-btn { margin-left: 2px; }
   /* minmax(0, 1fr)必須: ただの1fr(=minmax(auto,1fr))だと、white-space:nowrapな.cal-chipの
      文字の長さがトラックの最小幅を押し広げ、グリッド全体が画面外にはみ出してしまう。 */
   .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
   .cal-weekday {
-    background: var(--paper-sunken); text-align: center; font-size: 14.5px; font-weight: 700; color: var(--ink-soft);
+    background: var(--paper-sunken); text-align: center; font-size: 12.5px; font-weight: 700; color: var(--ink-soft);
     padding: 7px 0; letter-spacing: .04em;
   }
   .cal-weekday.sun { color: var(--warn); }
   .cal-weekday.sat { color: var(--info); }
-  .cal-cell { background: var(--paper-raised); min-height: 104px; min-width: 0; padding: 7px 7px 9px; display: flex; flex-direction: column; gap: 5px; }
+  .cal-cell { background: var(--paper-raised); min-height: 96px; min-width: 0; padding: 6px 6px 8px; display: flex; flex-direction: column; gap: 4px; }
   .cal-cell.out { background: var(--paper-sunken); }
   .cal-cell.out .cal-daynum { color: var(--ink-faint); }
-  .cal-daynum { font-family: var(--font-mono); font-size: 15px; color: var(--ink-soft); }
+  .cal-daynum { font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-soft); }
   .cal-cell.is-today .cal-daynum {
-    display: inline-flex; align-items: center; justify-content: center; width: 25px; height: 25px;
+    display: inline-flex; align-items: center; justify-content: center; width: 21px; height: 21px;
     background: var(--accent); color: var(--paper-raised); border-radius: 50%; font-weight: 700;
   }
   .cal-chip {
-    font-size: 14px; padding: 3px 6px; border-radius: 2px; line-height: 1.4;
+    font-size: 11.5px; padding: 2px 5px; border-radius: 2px; line-height: 1.4;
     background: var(--paper-sunken); color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .cal-chip.q1 { background: var(--warn-soft); color: var(--warn); }
@@ -338,7 +338,7 @@
   .cal-chip.done { text-decoration: line-through; opacity: .6; }
   .cal-chip.overdue { background: var(--warn); color: var(--paper-raised); font-weight: 600; }
   .cal-chip-time { font-family: var(--font-mono); opacity: .8; }
-  .cal-more { font-size: 13.5px; color: var(--ink-faint); padding-left: 2px; }
+  .cal-more { font-size: 11px; color: var(--ink-faint); padding-left: 2px; }
   .unscheduled { margin-top: 24px; }
   .unscheduled-title { font-size: 15.5px; font-weight: 700; color: var(--ink-soft); letter-spacing: .04em; margin-bottom: 10px; text-transform: uppercase; }
   .unscheduled-row {
@@ -486,7 +486,7 @@
     main { padding: 22px 18px 50px; }
     .matrix, .board, .focus-wrap, .report-grid, .history-grid { grid-template-columns: 1fr; }
     .cal-cell { min-height: 64px; }
-    .cal-chip { font-size: 13px; }
+    .cal-chip { font-size: 10.5px; }
   }
 </style>
 </head>
@@ -2017,7 +2017,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608201409").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608201433").catch(function () {});
     });
   }
 </script>
