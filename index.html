@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608201433">
-<link rel="icon" href="icon-192.png?v=202608201433">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608201433">
+<link rel="manifest" href="manifest.json?v=202608201446">
+<link rel="icon" href="icon-192.png?v=202608201446">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608201446">
 <style>
   :root {
     --ink: #1C2321;
@@ -328,8 +328,9 @@
     background: var(--accent); color: var(--paper-raised); border-radius: 50%; font-weight: 700;
   }
   .cal-chip {
-    font-size: 11.5px; padding: 2px 5px; border-radius: 2px; line-height: 1.4;
-    background: var(--paper-sunken); color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    display: flex; flex-direction: column;
+    font-size: 11.5px; padding: 2px 5px; border-radius: 2px; line-height: 1.3;
+    background: var(--paper-sunken); color: var(--ink-soft);
   }
   .cal-chip.q1 { background: var(--warn-soft); color: var(--warn); }
   .cal-chip.q2 { background: var(--info-soft); color: var(--info); }
@@ -337,7 +338,8 @@
   .cal-chip.q4 { background: var(--paper-sunken); color: var(--ink-soft); }
   .cal-chip.done { text-decoration: line-through; opacity: .6; }
   .cal-chip.overdue { background: var(--warn); color: var(--paper-raised); font-weight: 600; }
-  .cal-chip-time { font-family: var(--font-mono); opacity: .8; }
+  .cal-chip-time { font-family: var(--font-mono); font-size: 10px; opacity: .8; }
+  .cal-chip-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cal-more { font-size: 11px; color: var(--ink-faint); padding-left: 2px; }
   .unscheduled { margin-top: 24px; }
   .unscheduled-title { font-size: 15.5px; font-weight: 700; color: var(--ink-soft); letter-spacing: .04em; margin-bottom: 10px; text-transform: uppercase; }
@@ -1419,8 +1421,12 @@
   function calChipHtml(t) {
     var cls = isOverdue(t) ? "overdue" : "q" + quadrantOf(t);
     var timeLabel = t.dueTime ? " " + t.dueTime : "";
+    // 時刻とタイトルを1行に並べてnowrap+ellipsisさせると、狭い列では「17:00 」だけで
+    // 幅を使い切ってしまいタイトルがほぼ見えなくなる。時刻はタイトルの上に小さく別行で
+    // 出し、タイトル側は列いっぱいを使って省略できるようにする。
     return '<button type="button" class="cal-chip ' + cls + (t.status === "done" ? " done" : "") + '" data-cal-edit="' + t.id + '" title="' + escapeHtml(t.no + " " + t.title + timeLabel) + '">' +
-      (t.dueTime ? '<span class="cal-chip-time">' + t.dueTime + '</span> ' : "") + escapeHtml(t.title) + '</button>';
+      (t.dueTime ? '<span class="cal-chip-time">' + t.dueTime + '</span>' : "") +
+      '<span class="cal-chip-title">' + escapeHtml(t.title) + '</span></button>';
   }
   function calNavLabel() {
     var d = calRefDate();
@@ -2017,7 +2023,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608201433").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608201446").catch(function () {});
     });
   }
 </script>
