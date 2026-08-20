@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608201005">
-<link rel="icon" href="icon-192.png?v=202608201005">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608201005">
+<link rel="manifest" href="manifest.json?v=202608201009">
+<link rel="icon" href="icon-192.png?v=202608201009">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608201009">
 <style>
   :root {
     --ink: #1C2321;
@@ -1712,8 +1712,13 @@
         e.preventDefault();
         var input = document.getElementById("captureInput");
         addTask(input.value);
-        input.value = "";
-        input.focus();
+        // addTask()内のrender()が#mainを丸ごと作り直すため、上の`input`は既に
+        // ドキュメントから外れた古い参照になっている。value/focusをそこに設定しても
+        // 何も起きず、起票のたびに入力欄のフォーカスが失われていた(次の一打目が
+        // どこにも入らない → 「日本語入力できなくなる」の一因)。render後に
+        // あらためて今のノードを取り直す。
+        var freshInput = document.getElementById("captureInput");
+        if (freshInput) { freshInput.value = ""; freshInput.focus(); }
       });
     }
     Array.prototype.forEach.call(main.querySelectorAll("[data-flag]"), function (btn) {
@@ -2006,7 +2011,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608201005").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608201009").catch(function () {});
     });
   }
 </script>
