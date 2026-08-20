@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608201009">
-<link rel="icon" href="icon-192.png?v=202608201009">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608201009">
+<link rel="manifest" href="manifest.json?v=202608201409">
+<link rel="icon" href="icon-192.png?v=202608201409">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608201409">
 <style>
   :root {
     --ink: #1C2321;
@@ -1225,8 +1225,14 @@
     } else if (googleState.status === "checking") {
       html = '<div class="sync-row"><span class="sync-dot"></span><span>📅 確認中…</span></div>';
     } else if (googleState.status === "err") {
+      // 「再試行」はtriggerGoogleSync()をもう一度叩くだけなので、リフレッシュトークンの
+      // 期限切れ/失効(invalid_grant)のような、再試行では直らないエラーだと詰んでしまう
+      // (再接続の導線がここにしか出ない「未接続」状態には二度と戻れない)。
+      // エラー時にも常に再接続ボタンを出しておく。
       html = '<div class="sync-row"><span class="sync-dot err"></span><span>📅 同期エラー</span></div>' +
-        '<button class="sync-link-btn" id="googleRetryBtn">再試行</button>';
+        '<div class="sync-meta">Google側でアクセスが切れている場合があります</div>' +
+        '<button class="sync-link-btn" id="googleRetryBtn">再試行</button>' +
+        '<button class="btn btn-sm notify-request-btn" id="googleConnectBtn" style="margin-top:6px;width:100%">📅 Googleカレンダーと再接続</button>';
     } else {
       html = '<button class="btn btn-sm notify-request-btn" id="googleConnectBtn">📅 Googleカレンダーと接続</button>';
     }
@@ -2011,7 +2017,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608201009").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608201409").catch(function () {});
     });
   }
 </script>
