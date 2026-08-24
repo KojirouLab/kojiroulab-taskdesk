@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608201524">
-<link rel="icon" href="icon-192.png?v=202608201524">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608201524">
+<link rel="manifest" href="manifest.json?v=202608242105">
+<link rel="icon" href="icon-192.png?v=202608242105">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608242105">
 <style>
   :root {
     --ink: #1C2321;
@@ -1509,6 +1509,7 @@
         (t.note ? '<p class="ticket-note">' + escapeHtml(t.note) + '</p>' : "") +
         '<div class="ticket-actions">' + (t.status !== "done" ? '<span class="pomo-dots" title="ポモドーロ進捗">' + pomoDots(t) + '</span>' : "") +
         ticketDueHtml(t) + '<span class="spacer"></span>' +
+        (t.status !== "done" ? '<button class="btn btn-sm" data-complete="' + t.id + '">完了 ✓</button>' : "") +
         '<button class="btn btn-sm" data-focus-task="' + t.id + '">集中する</button>' +
         '<button class="btn-ghost" data-del="' + t.id + '">削除</button></div></div>';
     }).join("");
@@ -1532,7 +1533,8 @@
       html += '<div class="unscheduled"><div class="unscheduled-title">期限未定のチケット</div>';
       unscheduled.forEach(function (t) {
         html += '<div class="unscheduled-row" data-cal-edit="' + t.id + '"><span class="ticket-no">' + t.no + '</span>' +
-          '<span class="ticket-title-inline">' + escapeHtml(t.title) + '</span>' + ticketDueHtml(t) + '</div>';
+          '<span class="ticket-title-inline">' + escapeHtml(t.title) + '</span>' + ticketDueHtml(t) +
+          '<button class="btn btn-sm" data-complete="' + t.id + '">完了 ✓</button></div>';
       });
       html += '</div>';
     }
@@ -2024,7 +2026,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608201524").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608242105").catch(function () {});
     });
   }
 </script>
