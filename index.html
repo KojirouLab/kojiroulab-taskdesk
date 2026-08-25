@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608251645">
-<link rel="icon" href="icon-192.png?v=202608251645">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608251645">
+<link rel="manifest" href="manifest.json?v=202608252041">
+<link rel="icon" href="icon-192.png?v=202608252041">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608252041">
 <style>
   :root {
     --ink: #1C2321;
@@ -346,20 +346,24 @@
   .unscheduled { margin-top: 24px; }
   .unscheduled-title { font-size: 15.5px; font-weight: 700; color: var(--ink-soft); letter-spacing: .04em; margin-bottom: 10px; text-transform: uppercase; }
   .unscheduled-row {
-    display: flex; align-items: center; gap: 10px; background: var(--paper-raised); border: 1px solid var(--line);
+    display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; background: var(--paper-raised); border: 1px solid var(--line);
     border-radius: 4px; padding: 9px 12px; margin-bottom: 6px; cursor: pointer;
   }
   .unscheduled-row:hover { background: var(--paper-sunken); }
   .unscheduled-row .ticket-no { flex-shrink: 0; }
-  .unscheduled-row .ticket-title-inline { flex: 1; font-size: 16.5px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .unscheduled-row .ticket-title-inline { flex: 1; font-size: 16.5px; font-weight: 600; min-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 期限コントロール一式はタイトルと幅を取り合わないよう、常に自分の行に折り返す */
+  .unscheduled-controls { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
   /* クリックしてチケットを編集できる箇所(カレンダーのチップ・行・日表示カード)の共通の見た目 */
   button.cal-chip { border: none; width: 100%; text-align: left; font: inherit; cursor: pointer; }
   button.cal-chip:hover { filter: brightness(0.93); }
   @media (prefers-color-scheme: dark) { button.cal-chip:hover { filter: brightness(1.15); } }
   :root[data-theme="dark"] button.cal-chip:hover { filter: brightness(1.15); }
-  .cal-day-ticket { cursor: pointer; }
-  .cal-day-ticket:hover { border-color: var(--accent); }
+  /* カレンダーの日表示だけでなく、受信箱・マトリクス・ボードのチケットにも
+     使う(クリックで編集モーダルを開ける、の共通の見た目)。 */
+  .ticket-clickable { cursor: pointer; }
+  .ticket-clickable:hover { border-color: var(--accent); }
 
   /* ---------- Edit modal ---------- */
   .modal-overlay {
@@ -410,6 +414,32 @@
     display: flex; align-items: center; gap: 8px; margin-top: 18px; padding-top: 14px;
     border-top: 1px dashed var(--line);
   }
+
+  /* ---------- 添付ファイル ---------- */
+  .attach-empty { color: var(--ink-faint); font-size: 12.5px; margin-bottom: 8px; }
+  .attach-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .attach-item {
+    display: flex; align-items: center; gap: 8px; background: var(--paper);
+    border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px;
+  }
+  .attach-open { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; color: inherit; text-decoration: none; }
+  .attach-open:hover .attach-name { text-decoration: underline; }
+  .attach-thumb { width: 32px; height: 32px; border-radius: 3px; object-fit: cover; flex-shrink: 0; background: var(--paper-sunken); }
+  .attach-icon { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
+  .attach-info { display: flex; flex-direction: column; min-width: 0; }
+  .attach-name { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .attach-meta { font-size: 10.5px; color: var(--ink-faint); }
+  .attach-uploading { opacity: .7; }
+  .attach-remove {
+    background: none; border: none; color: var(--ink-faint); cursor: pointer; font-size: 15px;
+    line-height: 1; padding: 4px; flex-shrink: 0;
+  }
+  .attach-remove:hover { color: var(--warn); }
+  .attach-add-btn {
+    display: inline-block; border: 1px dashed var(--line); border-radius: 4px; padding: 6px 12px;
+    font-size: 12.5px; font-weight: 600; color: var(--ink-soft); cursor: pointer;
+  }
+  .attach-add-btn:hover { border-color: var(--accent); color: var(--accent); }
 
   /* ---------- Focus / Pomodoro ---------- */
   .focus-wrap { display: grid; grid-template-columns: 1.1fr .9fr; gap: 26px; align-items: start; }
@@ -539,6 +569,9 @@
   var GOOGLE_CLIENT_ID = "77479233975-46fbv93ldli7n3d6vqdm8t2v3hbolc8m.apps.googleusercontent.com";
   var GOOGLE_OAUTH_REDIRECT_URI = SUPABASE_URL + "/functions/v1/taskdesk-google-oauth-callback";
   var GOOGLE_SYNC_FN_URL = SUPABASE_URL + "/functions/v1/taskdesk-google-sync";
+  // チケットへの添付ファイル置き場(Supabase Storage、supabase_attachments.sql参照)。
+  // taskdesk_stateと同じ信頼モデルでanon keyに読み書き・削除を広く許可している。
+  var ATTACHMENTS_BUCKET = "taskdesk-attachments";
 
   var VIEWS = [
     { id: "inbox",    num: "01", jp: "受信箱",     en: "INBOX"    },
@@ -647,6 +680,47 @@
     if (freq === "weekly") return "毎週";
     if (freq && freq.indexOf("monthly") === 0) return "毎月";
     return "";
+  }
+
+  function attachmentIcon(type) {
+    type = type || "";
+    if (type.indexOf("image/") === 0) return "🖼️";
+    if (type.indexOf("video/") === 0) return "🎞️";
+    if (type.indexOf("audio/") === 0) return "🎵";
+    if (type === "application/pdf") return "📄";
+    if (type.indexOf("spreadsheet") !== -1 || type.indexOf("excel") !== -1) return "📊";
+    if (type.indexOf("word") !== -1 || type.indexOf("document") !== -1) return "📝";
+    if (type.indexOf("zip") !== -1 || type.indexOf("compressed") !== -1) return "🗜️";
+    return "📎";
+  }
+  function formatFileSize(bytes) {
+    if (bytes == null) return "";
+    if (bytes < 1024) return bytes + "B";
+    if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + "KB";
+    return (bytes / 1024 / 1024).toFixed(1) + "MB";
+  }
+  // 画像はサムネイルをその場に、それ以外はアイコン+ファイル名。クリックで新しいタブに
+  // 開く(PDF・動画・音声はブラウザが自前でプレビュー表示してくれる)。
+  function attachmentListHtml(t) {
+    var atts = t.attachments || [];
+    if (!atts.length) return '<div class="attach-empty">添付ファイルはありません</div>';
+    return '<div class="attach-list">' + atts.map(function (a) {
+      if (a.uploading) {
+        return '<div class="attach-item attach-uploading"><span class="attach-icon">⏳</span>' +
+          '<span class="attach-info"><span class="attach-name">' + escapeHtml(a.name) + '</span>' +
+          '<span class="attach-meta">アップロード中…</span></span></div>';
+      }
+      var isImage = (a.type || "").indexOf("image/") === 0;
+      var preview = isImage
+        ? '<img class="attach-thumb" src="' + escapeHtml(a.url) + '" alt="" loading="lazy">'
+        : '<span class="attach-icon">' + attachmentIcon(a.type) + '</span>';
+      return '<div class="attach-item">' +
+        '<a class="attach-open" href="' + escapeHtml(a.url) + '" target="_blank" rel="noopener">' + preview +
+        '<span class="attach-info"><span class="attach-name">' + escapeHtml(a.name) + '</span>' +
+        '<span class="attach-meta">' + formatFileSize(a.size) + '</span></span></a>' +
+        '<button type="button" class="attach-remove" data-attach-remove="' + a.id + '" title="削除">×</button>' +
+        '</div>';
+    }).join("") + '</div>';
   }
 
   function seedState() {
@@ -787,10 +861,89 @@
   function deleteTask(id) {
     var t = findTask(id);
     if (t && t.googleEventId) state.pendingGoogleDeletes.push(t.googleEventId);
+    if (t && t.attachments && t.attachments.length) {
+      t.attachments.forEach(function (a) { if (a.path) deleteAttachmentFile(a.path); });
+    }
     state.tasks = state.tasks.filter(function (t) { return t.id !== id; });
     if (state.timer.taskId === id) state.timer.taskId = null;
     save(); render();
     if (t && t.googleEventId) triggerGoogleSync();
+  }
+
+  /* ---------------- 添付ファイル(Supabase Storage) ---------------- */
+  function attachmentSafeName(name) {
+    return (name || "file").replace(/[^\w.\-]+/g, "_").slice(0, 80);
+  }
+  function attachmentObjectUrl(path) {
+    return SUPABASE_URL + "/storage/v1/object/" + ATTACHMENTS_BUCKET + "/" +
+      path.split("/").map(encodeURIComponent).join("/");
+  }
+  function attachmentPublicUrl(path) {
+    return SUPABASE_URL + "/storage/v1/object/public/" + ATTACHMENTS_BUCKET + "/" +
+      path.split("/").map(encodeURIComponent).join("/");
+  }
+  function deleteAttachmentFile(path) {
+    if (!path) return;
+    fetch(attachmentObjectUrl(path), {
+      method: "DELETE",
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + SUPABASE_ANON_KEY }
+    }).catch(function () {});
+  }
+  function uploadAttachment(taskId, file) {
+    var path = getSyncId() + "/" + taskId + "/" + Date.now() + "-" +
+      Math.random().toString(36).slice(2, 6) + "-" + attachmentSafeName(file.name);
+    return fetch(attachmentObjectUrl(path), {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: "Bearer " + SUPABASE_ANON_KEY,
+        "Content-Type": file.type || "application/octet-stream"
+      },
+      body: file
+    }).then(function (res) {
+      if (!res.ok) throw new Error("upload failed: " + res.status);
+      return {
+        id: Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+        name: file.name, path: path, url: attachmentPublicUrl(path),
+        type: file.type || "", size: file.size, uploadedAt: Date.now()
+      };
+    });
+  }
+  // アップロードは非同期(数秒かかることがある)。先にプレースホルダーを積んで
+  // 「アップロード中…」を見せ、完了したら本物の添付情報に差し替える。
+  function addAttachments(id, files) {
+    var t = findTask(id); if (!t) return;
+    if (!t.attachments) t.attachments = [];
+    Array.prototype.forEach.call(files, function (file) {
+      var placeholderId = "up-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+      t.attachments.push({ id: placeholderId, name: file.name, uploading: true });
+      uploadAttachment(id, file).then(function (att) {
+        var task = findTask(id); if (!task || !task.attachments) return;
+        var idx = task.attachments.findIndex ? task.attachments.findIndex(function (a) { return a.id === placeholderId; }) : -1;
+        if (idx === -1) { for (var i = 0; i < task.attachments.length; i++) { if (task.attachments[i].id === placeholderId) { idx = i; break; } } }
+        if (idx !== -1) task.attachments[idx] = att; else task.attachments.push(att);
+        touch(task); save(); render();
+        if (editingTaskId === id) renderEditModal();
+      }).catch(function () {
+        var task = findTask(id); if (!task || !task.attachments) return;
+        task.attachments = task.attachments.filter(function (a) { return a.id !== placeholderId; });
+        save(); render();
+        if (editingTaskId === id) renderEditModal();
+        pushToast((file.name || "ファイル") + " のアップロードに失敗しました");
+      });
+    });
+    render();
+    if (editingTaskId === id) renderEditModal();
+  }
+  function removeAttachment(id, attId) {
+    var t = findTask(id); if (!t || !t.attachments) return;
+    var att = null;
+    for (var i = 0; i < t.attachments.length; i++) { if (t.attachments[i].id === attId) { att = t.attachments[i]; break; } }
+    if (!att) return;
+    t.attachments = t.attachments.filter(function (a) { return a.id !== attId; });
+    touch(t); save(); render();
+    if (editingTaskId === id) renderEditModal();
+    if (att.path) deleteAttachmentFile(att.path);
   }
   var STATUS_ORDER = ["todo", "doing", "done"];
   function moveStatus(id, dir) {
@@ -1359,7 +1512,7 @@
       html += '<div class="empty-state">受信箱は空です。頭の中のことを書き出しましょう。</div>';
     } else {
       html += untriaged.map(function (t) {
-        return '<div class="ticket"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' + repeatPillHtml(t) + '</div>' +
+        return '<div class="ticket ticket-clickable" data-cal-edit="' + t.id + '"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' + repeatPillHtml(t) + '</div>' +
           '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
           (t.note ? '<p class="ticket-note">' + escapeHtml(t.note) + '</p>' : "") +
           '<div class="ticket-actions">' + ticketFlagsHtml(t) + ticketDueHtml(t) +
@@ -1386,7 +1539,7 @@
         html += '<div class="empty-state">ここにはまだチケットがありません。</div>';
       } else {
         html += items.map(function (t) {
-          return '<div class="ticket"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' + repeatPillHtml(t) + '</div>' +
+          return '<div class="ticket ticket-clickable" data-cal-edit="' + t.id + '"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' + repeatPillHtml(t) + '</div>' +
             '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
             '<div class="ticket-actions">' + ticketFlagsHtml(t) + ticketDueHtml(t) +
             '<span class="spacer"></span><button class="btn btn-sm" data-complete="' + t.id + '">完了 ✓</button>' +
@@ -1503,7 +1656,7 @@
     if (!items.length) return '<div class="empty-state">この日に期限のあるチケットはありません。</div>';
     return items.map(function (t) {
       var meta = QUAD_META[quadrantOf(t)];
-      return '<div class="ticket cal-day-ticket status-' + t.status + '" data-cal-edit="' + t.id + '"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' +
+      return '<div class="ticket ticket-clickable status-' + t.status + '" data-cal-edit="' + t.id + '"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' +
         '<span class="pill ' + meta.cls + '">' + meta.title + '</span>' + repeatPillHtml(t) + '</div>' +
         '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
         (t.note ? '<p class="ticket-note">' + escapeHtml(t.note) + '</p>' : "") +
@@ -1533,8 +1686,9 @@
       html += '<div class="unscheduled"><div class="unscheduled-title">期限未定のチケット</div>';
       unscheduled.forEach(function (t) {
         html += '<div class="unscheduled-row" data-cal-edit="' + t.id + '"><span class="ticket-no">' + t.no + '</span>' +
-          '<span class="ticket-title-inline">' + escapeHtml(t.title) + '</span>' + ticketDueHtml(t) +
-          '<button class="btn btn-sm" data-complete="' + t.id + '">完了 ✓</button></div>';
+          '<span class="ticket-title-inline">' + escapeHtml(t.title) + '</span>' +
+          '<span class="unscheduled-controls">' + ticketDueHtml(t) +
+          '<button class="btn btn-sm" data-complete="' + t.id + '">完了 ✓</button></span></div>';
       });
       html += '</div>';
     }
@@ -1573,7 +1727,7 @@
       } else {
         items.forEach(function (t) {
           var meta = QUAD_META[quadrantOf(t)];
-          html += '<div class="ticket status-' + t.status + '"' + (IS_TOUCH ? "" : ' draggable="true"') + ' data-drag="' + t.id + '">' +
+          html += '<div class="ticket ticket-clickable status-' + t.status + '"' + (IS_TOUCH ? "" : ' draggable="true"') + ' data-drag="' + t.id + '" data-cal-edit="' + t.id + '">' +
             '<div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' +
             '<span class="pill ' + meta.cls + '">' + meta.title + '</span>' + repeatPillHtml(t) + '</div>' +
             '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
@@ -1905,6 +2059,9 @@
 
     html += '<div class="modal-field"><label>期限</label>' + ticketDueHtml(t) + '</div>';
 
+    html += '<div class="modal-field"><label>添付ファイル</label>' + attachmentListHtml(t) +
+      '<label class="attach-add-btn">＋ ファイルを追加<input type="file" id="modalAttachInput" multiple hidden></label></div>';
+
     html += '<div class="modal-actions">';
     if (t.triaged) {
       if (t.status !== "done") html += '<button type="button" class="btn btn-sm" id="modalFocusBtn">集中する</button>';
@@ -1936,6 +2093,16 @@
         t.note = noteInput.value; touch(t); save();
       });
     }
+
+    var attachInput = overlay.querySelector("#modalAttachInput");
+    if (attachInput) {
+      attachInput.addEventListener("change", function () {
+        if (attachInput.files && attachInput.files.length) addAttachments(id, attachInput.files);
+      });
+    }
+    Array.prototype.forEach.call(overlay.querySelectorAll("[data-attach-remove]"), function (btn) {
+      btn.addEventListener("click", function () { removeAttachment(id, btn.dataset.attachRemove); });
+    });
 
     Array.prototype.forEach.call(overlay.querySelectorAll("[data-flag]"), function (btn) {
       btn.addEventListener("click", function () { toggleFlag(Number(btn.dataset.id), btn.dataset.flag); renderEditModal(); });
@@ -2032,7 +2199,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608251645").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608252041").catch(function () {});
     });
   }
 </script>
