@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608242105">
-<link rel="icon" href="icon-192.png?v=202608242105">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608242105">
+<link rel="manifest" href="manifest.json?v=202608251645">
+<link rel="icon" href="icon-192.png?v=202608251645">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608251645">
 <style>
   :root {
     --ink: #1C2321;
@@ -1732,8 +1732,14 @@
         // 何も起きず、起票のたびに入力欄のフォーカスが失われていた(次の一打目が
         // どこにも入らない → 「日本語入力できなくなる」の一因)。render後に
         // あらためて今のノードを取り直す。
-        var freshInput = document.getElementById("captureInput");
-        if (freshInput) { freshInput.value = ""; freshInput.focus(); }
+        // さらに、作り直した直後に同期的にfocus()すると、Mac版Chrome/Safariでは
+        // 日本語入力ソースへの切り替えが効かなくなることがある(プログラムによる
+        // focus()がユーザー操作起点として扱われにくいため)。1ティック遅らせて
+        // ブラウザに新しい要素を完全に落ち着かせてからfocusする。
+        setTimeout(function () {
+          var freshInput = document.getElementById("captureInput");
+          if (freshInput) { freshInput.value = ""; freshInput.focus(); }
+        }, 0);
       });
     }
     Array.prototype.forEach.call(main.querySelectorAll("[data-flag]"), function (btn) {
@@ -2026,7 +2032,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608242105").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608251645").catch(function () {});
     });
   }
 </script>
