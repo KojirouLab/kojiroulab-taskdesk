@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608252041">
-<link rel="icon" href="icon-192.png?v=202608252041">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608252041">
+<link rel="manifest" href="manifest.json?v=202608261521">
+<link rel="icon" href="icon-192.png?v=202608261521">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608261521">
 <style>
   :root {
     --ink: #1C2321;
@@ -472,6 +472,9 @@
   .week-range { font-family: var(--font-mono); font-size: 16.5px; color: var(--ink-soft); }
   .stat-chips { display: flex; gap: 8px; margin-bottom: 20px; }
   .stat-chip { background: var(--accent-soft); color: var(--accent-ink); border-radius: 3px; padding: 5px 11px; font-size: 15.5px; font-weight: 600; }
+  .done-week { margin-bottom: 26px; }
+  .done-week-title { font-size: 15.5px; font-weight: 700; color: var(--ink-soft); letter-spacing: .04em; margin-bottom: 10px; text-transform: uppercase; }
+  .done-week-date { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); }
   .report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 30px; }
   .report-cell { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 5px; padding: 14px; }
   .report-cell.r1 { border-top: 3px solid var(--good); }
@@ -800,6 +803,11 @@
 
   /* ---------------- Week helpers (木曜始まり〜水曜終わり) ---------------- */
   function weekRangeFmt(dt) { return (dt.getMonth() + 1) + "/" + dt.getDate(); }
+  function formatCompletedDate(ms) {
+    var d = new Date(ms);
+    return (d.getMonth() + 1) + "/" + d.getDate() + "(" + CAL_WEEKDAY_LABELS[d.getDay()] + ") " +
+      pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
   function weekInfo(date) {
     var dow = date.getDay(); // 0=Sun..6=Sat
     var diffToThu = (dow - 4 + 7) % 7; // Thu=4
@@ -1787,9 +1795,10 @@
   function renderReview() {
     var wk = weekInfo(new Date());
     var rv = getReview(wk.key);
-    var doneThisWeek = state.tasks.filter(function (t) {
+    var doneThisWeekTasks = state.tasks.filter(function (t) {
       return t.status === "done" && t.completedAt && t.completedAt >= wk.start.getTime() && t.completedAt <= wk.end.getTime() + 86399999;
-    }).length;
+    }).sort(function (a, b) { return b.completedAt - a.completedAt; });
+    var doneThisWeek = doneThisWeekTasks.length;
     var pomoThisWeek = state.pomodoroLog.filter(function (p) {
       var d = new Date(p.date);
       return d >= stripTime(wk.start) && d <= stripTime(wk.end);
@@ -1798,6 +1807,22 @@
     var html = viewHead("06 · WEEKLY REPORT", "週次報告書", "木曜始まり〜水曜終わりの1週間をまとめる。①②は「うまくいったこと」を意図の有無で分け、③〜⑤で改善・停止・相談を切り分ける。");
     html += '<div class="week-bar"><span class="week-range">今週 ' + wk.range + '</span></div>';
     html += '<div class="stat-chips"><span class="stat-chip">今週の完了 ' + doneThisWeek + ' 件</span><span class="stat-chip">今週の集中 ' + pomoThisWeek + ' 本</span></div>';
+
+    html += '<div class="done-week"><div class="done-week-title">今週完了したチケット</div>';
+    if (!doneThisWeekTasks.length) {
+      html += '<div class="empty-state">今週完了したチケットはまだありません。</div>';
+    } else {
+      html += doneThisWeekTasks.map(function (t) {
+        var meta = QUAD_META[quadrantOf(t)];
+        return '<div class="ticket ticket-clickable status-done" data-cal-edit="' + t.id + '">' +
+          '<div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' +
+          '<span class="pill ' + meta.cls + '">' + meta.title + '</span>' + repeatPillHtml(t) +
+          '<span class="spacer"></span><span class="done-week-date">' + formatCompletedDate(t.completedAt) + '</span></div>' +
+          '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
+          (t.note ? '<p class="ticket-note">' + escapeHtml(t.note) + '</p>' : "") + '</div>';
+      }).join("");
+    }
+    html += '</div>';
 
     html += '<div class="report-grid">';
     REPORT_FIELDS.forEach(function (f) {
@@ -2199,7 +2224,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608252041").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202608261521").catch(function () {});
     });
   }
 </script>
