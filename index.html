@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202609011826">
-<link rel="icon" href="icon-192.png?v=202609011826">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609011826">
+<link rel="manifest" href="manifest.json?v=202609011837">
+<link rel="icon" href="icon-192.png?v=202609011837">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609011837">
 <style>
   :root {
     --ink: #1C2321;
@@ -250,6 +250,12 @@
     background: var(--paper); border: 1px solid var(--line); border-radius: 2px;
     padding: 5px 7px; font-size: 15.5px; color: var(--ink);
   }
+  .weekday-toggle-group { display: inline-flex; gap: 3px; flex-wrap: wrap; }
+  .weekday-toggle {
+    border: 1px solid var(--line); background: var(--paper); color: var(--ink-soft);
+    border-radius: 2px; width: 28px; height: 28px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  }
+  .weekday-toggle.on { background: var(--accent); border-color: var(--accent); color: var(--paper-raised); }
   .due-group.overdue .due-field input[type="date"],
   .due-group.overdue .due-field input[type="time"] { border-color: var(--warn); color: var(--warn); }
 
@@ -647,12 +653,21 @@
     while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
     return d;
   }
-  // freq(文字列)と基準日から、次回の発生日を計算する。
-  function computeNextDate(base, freq) {
+  // freq(文字列)と基準日から、次回の発生日を計算する。weekdaysは"weeklyMulti"専用
+  // (選んだ曜日の中から基準日の翌日以降で一番近いものを1週間以内で探す)。
+  function computeNextDate(base, freq, weekdays) {
     var y = base.getFullYear(), m = base.getMonth(), d = base.getDate();
     switch (freq) {
       case "daily": return new Date(y, m, d + 1);
       case "weekly": return new Date(y, m, d + 7);
+      case "weeklyMulti": {
+        var days = (weekdays && weekdays.length) ? weekdays : [base.getDay()];
+        for (var add = 1; add <= 7; add++) {
+          var cand = new Date(y, m, d + add);
+          if (days.indexOf(cand.getDay()) !== -1) return cand;
+        }
+        return new Date(y, m, d + 7);
+      }
       case "monthlyDate": return new Date(y, m + 1, Math.min(d, lastDayOfMonth(y, m + 1)));
       case "monthlyNth": return nthWeekdayDate(y, m + 1, base.getDay(), nthWeekdayOfMonth(base));
       case "monthlyLastWeekday": return lastWeekdayDate(y, m + 1, base.getDay());
@@ -671,6 +686,7 @@
       { v: "", label: "なし" },
       { v: "daily", label: "毎日" },
       { v: "weekly", label: "毎週" + wdName },
+      { v: "weeklyMulti", label: "毎週(曜日を選択)" },
       { v: "monthlyDate", label: "毎月" + base.getDate() + "日" },
       { v: "monthlyNth", label: "毎月" + (NTH_NAMES[nth] || ("第" + nth)) + wdName },
       { v: "monthlyLastWeekday", label: "毎月最終" + wdName },
@@ -682,9 +698,21 @@
       return '<option value="' + o.v + '"' + (o.v === (t.repeat || "") ? " selected" : "") + '>' + o.label + '</option>';
     }).join("");
   }
+  // "weeklyMulti"の時だけ、選んだ曜日をトグルできるボタンを追加で出す。
+  function repeatWeekdaysHtml(t) {
+    if (t.repeat !== "weeklyMulti") return "";
+    var days = t.repeatWeekdays || [];
+    var html = '<span class="due-field repeat-weekdays-field"><span>曜日</span><span class="weekday-toggle-group">';
+    WEEKDAY_NAMES.forEach(function (name, idx) {
+      var on = days.indexOf(idx) !== -1;
+      html += '<button type="button" class="weekday-toggle' + (on ? " on" : "") + '" data-repeat-weekday="' + idx + '" data-repeat-weekday-task="' + t.id + '">' + name + '</button>';
+    });
+    html += '</span></span>';
+    return html;
+  }
   function repeatPillLabel(freq) {
     if (freq === "daily") return "毎日";
-    if (freq === "weekly") return "毎週";
+    if (freq === "weekly" || freq === "weeklyMulti") return "毎週";
     if (freq && freq.indexOf("monthly") === 0) return "毎月";
     return "";
   }
@@ -984,6 +1012,21 @@
   function setRepeat(id, value) {
     var t = findTask(id); if (!t) return;
     t.repeat = value || null;
+    // 「曜日を選択」に切り替えた直後は、今の期限日の曜日だけ選んだ状態から始める
+    // (選択が空のまま次回日を計算すると1週間ループしてしまうため)。
+    if (t.repeat === "weeklyMulti" && (!t.repeatWeekdays || !t.repeatWeekdays.length)) {
+      var base = t.dueDate ? new Date(t.dueDate + "T00:00:00") : new Date();
+      t.repeatWeekdays = [base.getDay()];
+    }
+    touch(t); save(); deferRender();
+  }
+  function toggleRepeatWeekday(id, weekday) {
+    var t = findTask(id); if (!t) return;
+    var days = t.repeatWeekdays ? t.repeatWeekdays.slice() : [];
+    var idx = days.indexOf(weekday);
+    if (idx === -1) days.push(weekday); else days.splice(idx, 1);
+    days.sort(function (a, b) { return a - b; });
+    t.repeatWeekdays = days;
     touch(t); save(); deferRender();
   }
   // 繰り返しタスクが完了した時、次回分のチケットを新規発行する。
@@ -991,14 +1034,15 @@
   function spawnRecurrence(t) {
     state.counter += 1;
     var base = t.dueDate ? new Date(t.dueDate + "T00:00:00") : new Date();
-    var next = computeNextDate(base, t.repeat);
+    var next = computeNextDate(base, t.repeat, t.repeatWeekdays);
     state.tasks.unshift({
       id: state.counter, no: "No." + String(state.counter).padStart(3, "0"),
       title: t.title, note: t.note, createdAt: Date.now(), triaged: t.triaged,
       urgent: t.urgent, important: t.important, status: "todo",
       estPomodoros: t.estPomodoros, donePomodoros: 0, completedAt: null,
       dueDate: todayKey(next), dueTime: t.dueTime, reminderMin: t.reminderMin, notifiedAt: null,
-      repeat: t.repeat, googleEventId: null, googleSyncedAt: null, touchedAt: Date.now()
+      repeat: t.repeat, repeatWeekdays: t.repeatWeekdays || null,
+      googleEventId: null, googleSyncedAt: null, touchedAt: Date.now()
     });
   }
   function setDueDate(id, value) {
@@ -1506,12 +1550,18 @@
       html += '</select></label>';
     }
     html += '<label class="due-field"><span>繰り返し</span><select data-repeat="' + t.id + '">' + repeatOptionsHtml(t) + '</select></label>';
+    html += repeatWeekdaysHtml(t);
     html += '</span>';
     return html;
   }
   function repeatPillHtml(t) {
     if (!t.repeat) return "";
-    return '<span class="pill pill-repeat">↻ ' + repeatPillLabel(t.repeat) + '</span>';
+    var label = repeatPillLabel(t.repeat);
+    if (t.repeat === "weeklyMulti" && t.repeatWeekdays && t.repeatWeekdays.length) {
+      label = "毎週" + t.repeatWeekdays.slice().sort(function (a, b) { return a - b; })
+        .map(function (d) { return WEEKDAY_NAMES[d]; }).join("・");
+    }
+    return '<span class="pill pill-repeat">↻ ' + label + '</span>';
   }
 
   function renderInbox() {
@@ -1582,7 +1632,7 @@
     var dates = [];
     var cur = new Date(t.dueDate + "T00:00:00");
     for (var i = 0; i < 400 && dates.length < 60; i++) {
-      cur = computeNextDate(cur, t.repeat);
+      cur = computeNextDate(cur, t.repeat, t.repeatWeekdays);
       var key = todayKey(cur);
       if (key > rangeEndKey) break;
       if (key >= rangeStartKey) dates.push(key);
@@ -2010,6 +2060,9 @@
     Array.prototype.forEach.call(main.querySelectorAll("[data-repeat]"), function (sel) {
       sel.addEventListener("change", function () { setRepeat(Number(sel.dataset.repeat), sel.value); });
     });
+    Array.prototype.forEach.call(main.querySelectorAll("[data-repeat-weekday]"), function (btn) {
+      btn.addEventListener("click", function () { toggleRepeatWeekday(Number(btn.dataset.repeatWeekdayTask), Number(btn.dataset.repeatWeekday)); });
+    });
 
     // Calendar view
     var calPrev = document.getElementById("calPrev");
@@ -2204,6 +2257,9 @@
     Array.prototype.forEach.call(overlay.querySelectorAll("[data-repeat]"), function (sel) {
       sel.addEventListener("change", function () { setRepeat(Number(sel.dataset.repeat), sel.value); deferRenderModal(); });
     });
+    Array.prototype.forEach.call(overlay.querySelectorAll("[data-repeat-weekday]"), function (btn) {
+      btn.addEventListener("click", function () { toggleRepeatWeekday(Number(btn.dataset.repeatWeekdayTask), Number(btn.dataset.repeatWeekday)); renderEditModal(); });
+    });
 
     var sendBtn = overlay.querySelector("#modalSendBtn");
     if (sendBtn) sendBtn.addEventListener("click", function () { sendToBoard(id); renderEditModal(); });
@@ -2271,7 +2327,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202609011826").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202609011837").catch(function () {});
     });
   }
 </script>
