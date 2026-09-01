@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202609011837">
-<link rel="icon" href="icon-192.png?v=202609011837">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609011837">
+<link rel="manifest" href="manifest.json?v=202609012046">
+<link rel="icon" href="icon-192.png?v=202609012046">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609012046">
 <style>
   :root {
     --ink: #1C2321;
@@ -1009,9 +1009,14 @@
   // 走っている。その最中に同期的にrender()して要素を作り直すと、iOSでピッカーが
   // 閉じる動作自体を邪魔してしまう(消えたように見える)ため、1ティック遅らせる。
   function deferRender() { setTimeout(render, 0); }
+  // repeatAnchorDateは「繰り返しパターンの基準日」。カレンダーのプレビュー(未来の回)は
+  // 常にこの基準日から計算する。dueDate(今回の実際の期限)とは別に持つことで、
+  // 「今回だけ日付をずらす」と「パターンごと今後もこの日にずらす」を区別できるようにする。
   function setRepeat(id, value) {
     var t = findTask(id); if (!t) return;
     t.repeat = value || null;
+    // 繰り返しパターン自体を変えた(オン/オフ含む)ら、基準日は現在の期限日にリセットする。
+    t.repeatAnchorDate = t.repeat ? (t.dueDate || null) : null;
     // 「曜日を選択」に切り替えた直後は、今の期限日の曜日だけ選んだ状態から始める
     // (選択が空のまま次回日を計算すると1週間ループしてしまうため)。
     if (t.repeat === "weeklyMulti" && (!t.repeatWeekdays || !t.repeatWeekdays.length)) {
@@ -1027,28 +1032,43 @@
     if (idx === -1) days.push(weekday); else days.splice(idx, 1);
     days.sort(function (a, b) { return a - b; });
     t.repeatWeekdays = days;
+    t.repeatAnchorDate = t.dueDate || null; // 曜日パターンを変えたら基準日もリセット
     touch(t); save(); deferRender();
   }
   // 繰り返しタスクが完了した時、次回分のチケットを新規発行する。
-  // 起点は「完了した日」ではなく元の期限日(なければ今日)。
+  // 起点は「完了した日」ではなく繰り返しの基準日(なければ元の期限日、それも無ければ今日)。
   function spawnRecurrence(t) {
     state.counter += 1;
-    var base = t.dueDate ? new Date(t.dueDate + "T00:00:00") : new Date();
+    var anchorKey = t.repeatAnchorDate || t.dueDate;
+    var base = anchorKey ? new Date(anchorKey + "T00:00:00") : new Date();
     var next = computeNextDate(base, t.repeat, t.repeatWeekdays);
+    var nextKey = todayKey(next);
     state.tasks.unshift({
       id: state.counter, no: "No." + String(state.counter).padStart(3, "0"),
       title: t.title, note: t.note, createdAt: Date.now(), triaged: t.triaged,
       urgent: t.urgent, important: t.important, status: "todo",
       estPomodoros: t.estPomodoros, donePomodoros: 0, completedAt: null,
-      dueDate: todayKey(next), dueTime: t.dueTime, reminderMin: t.reminderMin, notifiedAt: null,
-      repeat: t.repeat, repeatWeekdays: t.repeatWeekdays || null,
+      dueDate: nextKey, dueTime: t.dueTime, reminderMin: t.reminderMin, notifiedAt: null,
+      repeat: t.repeat, repeatWeekdays: t.repeatWeekdays || null, repeatAnchorDate: nextKey,
       googleEventId: null, googleSyncedAt: null, touchedAt: Date.now()
     });
   }
   function setDueDate(id, value) {
     var t = findTask(id); if (!t) return;
-    t.dueDate = value || null;
-    if (!t.dueDate) { t.dueTime = null; t.reminderMin = null; }
+    var newDate = value || null;
+    if (t.repeat && t.repeatAnchorDate && newDate && newDate !== t.dueDate) {
+      // 繰り返し設定済みのチケットの期限日を変える時だけ確認する。
+      var extendSeries = window.confirm(
+        "この繰り返し予定の日付を変更します。\n\n" +
+        "「OK」= 今後の回もこの日付を基準にする\n" +
+        "「キャンセル」= 今回の予定だけ移動し、次回以降は元のパターンのまま"
+      );
+      if (extendSeries) t.repeatAnchorDate = newDate;
+    } else if (t.repeat && newDate) {
+      t.repeatAnchorDate = newDate; // 基準日がまだ無い(繰り返しを設定した直後など)場合は素直に追従
+    }
+    t.dueDate = newDate;
+    if (!t.dueDate) { t.dueTime = null; t.reminderMin = null; t.repeatAnchorDate = null; }
     t.notifiedAt = null;
     touch(t); save(); deferRender();
   }
@@ -1628,9 +1648,10 @@
   // まだ実在しない先の回を「プレビュー」として計算して重ねて出す。
   // 完了までは実体化しない(タスク一覧を無駄に埋めない)という設計自体は変えていない。
   function repeatOccurrenceDatesInRange(t, rangeStartKey, rangeEndKey) {
-    if (!t.repeat || !t.dueDate) return [];
+    var anchorKey = t.repeatAnchorDate || t.dueDate;
+    if (!t.repeat || !anchorKey) return [];
     var dates = [];
-    var cur = new Date(t.dueDate + "T00:00:00");
+    var cur = new Date(anchorKey + "T00:00:00");
     for (var i = 0; i < 400 && dates.length < 60; i++) {
       cur = computeNextDate(cur, t.repeat, t.repeatWeekdays);
       var key = todayKey(cur);
@@ -2327,7 +2348,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202609011837").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202609012046").catch(function () {});
     });
   }
 </script>
