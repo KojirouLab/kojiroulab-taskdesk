@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202608261521">
-<link rel="icon" href="icon-192.png?v=202608261521">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202608261521">
+<link rel="manifest" href="manifest.json?v=202609011826">
+<link rel="icon" href="icon-192.png?v=202609011826">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609011826">
 <style>
   :root {
     --ink: #1C2321;
@@ -342,6 +342,9 @@
      (等幅フォントとJPフォントを混ぜると、同じfont-size指定でも字面の大きさが揃わない)。 */
   .cal-chip-time { font-size: 10px; opacity: 1; }
   .cal-chip-title { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 繰り返しの「まだ発行されていない先の回」プレビュー。クリックできないことが
+     伝わるよう、薄く・破線にしてhoverの反応も付けない。 */
+  .cal-chip-virtual { opacity: .5; border: 1px dashed var(--line); background: transparent; cursor: default; }
   .cal-more { font-size: 11px; color: var(--ink-faint); padding-left: 2px; }
   .unscheduled { margin-top: 24px; }
   .unscheduled-title { font-size: 15.5px; font-weight: 700; color: var(--ink-soft); letter-spacing: .04em; margin-bottom: 10px; text-transform: uppercase; }
@@ -364,6 +367,7 @@
      使う(クリックで編集モーダルを開ける、の共通の見た目)。 */
   .ticket-clickable { cursor: pointer; }
   .ticket-clickable:hover { border-color: var(--accent); }
+  .ticket-virtual { opacity: .6; border-style: dashed; }
 
   /* ---------- Edit modal ---------- */
   .modal-overlay {
@@ -1568,11 +1572,37 @@
   function setCalRefDate(d) {
     state.calCursor = { year: d.getFullYear(), month: d.getMonth(), day: d.getDate() };
   }
-  function calByDateMap() {
+  // 繰り返しは「完了したら次の1件だけ発行する」方式なので、実際のチケットは常に
+  // 直近の1件しか存在しない。それだとカレンダー上は「毎週木曜日」に設定しても
+  // 先の木曜日には何も表示されず分かりにくいので、表示中の範囲(月/週/日)に限り、
+  // まだ実在しない先の回を「プレビュー」として計算して重ねて出す。
+  // 完了までは実体化しない(タスク一覧を無駄に埋めない)という設計自体は変えていない。
+  function repeatOccurrenceDatesInRange(t, rangeStartKey, rangeEndKey) {
+    if (!t.repeat || !t.dueDate) return [];
+    var dates = [];
+    var cur = new Date(t.dueDate + "T00:00:00");
+    for (var i = 0; i < 400 && dates.length < 60; i++) {
+      cur = computeNextDate(cur, t.repeat);
+      var key = todayKey(cur);
+      if (key > rangeEndKey) break;
+      if (key >= rangeStartKey) dates.push(key);
+    }
+    return dates;
+  }
+  function calByDateMap(rangeStartKey, rangeEndKey) {
     var byDate = {};
-    state.tasks.filter(function (t) { return t.triaged && t.dueDate; }).forEach(function (t) {
+    var activeTasks = state.tasks.filter(function (t) { return t.triaged && t.dueDate; });
+    activeTasks.forEach(function (t) {
       (byDate[t.dueDate] = byDate[t.dueDate] || []).push(t);
     });
+    if (rangeStartKey && rangeEndKey) {
+      activeTasks.filter(function (t) { return t.repeat && t.status !== "done"; }).forEach(function (t) {
+        repeatOccurrenceDatesInRange(t, rangeStartKey, rangeEndKey).forEach(function (dateKey) {
+          var virt = Object.assign({}, t, { dueDate: dateKey, status: "todo", completedAt: null, virtual: true });
+          (byDate[dateKey] = byDate[dateKey] || []).push(virt);
+        });
+      });
+    }
     // 各日の中では時刻順に並べる(時刻未設定は末尾)。state.tasksの並び(作成順)のままだと
     // カレンダー上でチケットが期限順になっていなかったため。
     Object.keys(byDate).forEach(function (k) {
@@ -1586,6 +1616,13 @@
     // 時刻とタイトルを1行に並べてnowrap+ellipsisさせると、狭い列では「17:00 」だけで
     // 幅を使い切ってしまいタイトルがほぼ見えなくなる。時刻はタイトルの上に小さく別行で
     // 出し、タイトル側は列いっぱいを使って省略できるようにする。
+    if (t.virtual) {
+      // まだ実在しない先の回のプレビュー。編集画面は開けない(実体が無いので)ので
+      // ボタンではなくspanにし、見た目も薄くする。
+      return '<span class="cal-chip cal-chip-virtual ' + cls + '" title="' + escapeHtml(t.no + " " + t.title + timeLabel + "(次回予定・未発行)") + '">' +
+        (t.dueTime ? '<span class="cal-chip-time">' + t.dueTime + '</span>' : "") +
+        '<span class="cal-chip-title">↻ ' + escapeHtml(t.title) + '</span></span>';
+    }
     return '<button type="button" class="cal-chip ' + cls + (t.status === "done" ? " done" : "") + '" data-cal-edit="' + t.id + '" title="' + escapeHtml(t.no + " " + t.title + timeLabel) + '">' +
       (t.dueTime ? '<span class="cal-chip-time">' + t.dueTime + '</span>' : "") +
       '<span class="cal-chip-title">' + escapeHtml(t.title) + '</span></button>';
@@ -1612,7 +1649,8 @@
     var todayStr = todayKey();
     var gridStart = new Date(year, month, 1 - startWeekday);
     var totalCells = Math.ceil((startWeekday + daysInMonth) / 7) * 7;
-    var byDate = calByDateMap();
+    var gridEnd = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + totalCells - 1);
+    var byDate = calByDateMap(todayKey(gridStart), todayKey(gridEnd));
 
     var html = '<div class="cal-grid">';
     CAL_WEEKDAY_LABELS.forEach(function (w, i) {
@@ -1636,8 +1674,9 @@
   function calWeekRowHtml() {
     var ref = calRefDate();
     var sunday = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate() - ref.getDay());
+    var saturday = new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate() + 6);
     var todayStr = todayKey();
-    var byDate = calByDateMap();
+    var byDate = calByDateMap(todayKey(sunday), todayKey(saturday));
 
     var html = '<div class="cal-grid">';
     CAL_WEEKDAY_LABELS.forEach(function (w, i) {
@@ -1660,9 +1699,17 @@
   function calDayListHtml() {
     var ref = calRefDate();
     var dKey = todayKey(ref);
-    var items = calByDateMap()[dKey] || [];
+    var items = calByDateMap(dKey, dKey)[dKey] || [];
     if (!items.length) return '<div class="empty-state">この日に期限のあるチケットはありません。</div>';
     return items.map(function (t) {
+      if (t.virtual) {
+        // まだ発行されていない先の回のプレビュー。編集も完了も削除もできない
+        // (実体が無いので)。前回分が完了すると、この日のものが本物として発行される。
+        return '<div class="ticket ticket-virtual"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' +
+          '<span class="pill pill-muted">↻ 次回予定</span></div>' +
+          '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
+          '<p class="ticket-note">まだ実際のチケットではありません。前回分が完了すると発行されます。</p></div>';
+      }
       var meta = QUAD_META[quadrantOf(t)];
       return '<div class="ticket ticket-clickable status-' + t.status + '" data-cal-edit="' + t.id + '"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' +
         '<span class="pill ' + meta.cls + '">' + meta.title + '</span>' + repeatPillHtml(t) + '</div>' +
@@ -2224,7 +2271,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202608261521").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202609011826").catch(function () {});
     });
   }
 </script>

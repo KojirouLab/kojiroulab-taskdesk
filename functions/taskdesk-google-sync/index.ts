@@ -200,6 +200,12 @@ Deno.serve(async (req) => {
 
       if (!eligible) {
         if (t.googleEventId) {
+          // seenEventIdsに登録しておかないと、下の「孤立イベント取り込み」ループが
+          // (eventsはこの関数の先頭で一度だけ取得した、削除前のスナップショットなので
+          // まだこのイベントを含んでいる)未回収のイベントだと誤解し、消したそばから
+          // 同じ内容の新規タスクとして復活させてしまう(実際に起きた不具合: 完了に
+          // した直後のGoogle同期で、そのチケットが未完了の別チケットとして再出現した)。
+          seenEventIds.add(t.googleEventId);
           await gcal(accessToken, calendarId, 'DELETE', `/events/${t.googleEventId}`);
         }
         nextTasks.push({ ...t, googleEventId: null, googleSyncedAt: null });
