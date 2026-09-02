@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202609012046">
-<link rel="icon" href="icon-192.png?v=202609012046">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609012046">
+<link rel="manifest" href="manifest.json?v=202609021036">
+<link rel="icon" href="icon-192.png?v=202609021036">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609021036">
 <style>
   :root {
     --ink: #1C2321;
@@ -482,10 +482,16 @@
   .week-range { font-family: var(--font-mono); font-size: 16.5px; color: var(--ink-soft); }
   .stat-chips { display: flex; gap: 8px; margin-bottom: 20px; }
   .stat-chip { background: var(--accent-soft); color: var(--accent-ink); border-radius: 3px; padding: 5px 11px; font-size: 15.5px; font-weight: 600; }
-  .done-week { margin-bottom: 26px; }
+  /* 今週完了したチケット一覧と、振り返りの入力欄を横並びにする。完了件数が多いと
+     一覧だけで画面が縦に伸びきってしまい振り返り欄が見えなくなるため、広い画面では
+     一覧側だけ内側スクロールにして、常に両方が視界に収まるようにする。 */
+  .review-columns { display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 24px; align-items: start; margin-bottom: 26px; }
+  @media (min-width: 1100px) {
+    .done-week { max-height: 72vh; overflow-y: auto; padding-right: 6px; }
+  }
   .done-week-title { font-size: 15.5px; font-weight: 700; color: var(--ink-soft); letter-spacing: .04em; margin-bottom: 10px; text-transform: uppercase; }
   .done-week-date { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); }
-  .report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 30px; }
+  .report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .report-cell { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 5px; padding: 14px; }
   .report-cell.r1 { border-top: 3px solid var(--good); }
   .report-cell.r2 { border-top: 3px solid var(--accent); }
@@ -531,7 +537,7 @@
     .notify-status, .sync-status { border-top: none; padding-top: 0; font-size: 13.5px; }
     .sync-connect-form { flex-direction: column; }
     main { padding: 22px 18px 50px; }
-    .matrix, .board, .focus-wrap, .report-grid, .history-grid { grid-template-columns: 1fr; }
+    .matrix, .board, .focus-wrap, .report-grid, .history-grid, .review-columns { grid-template-columns: 1fr; }
     .cal-cell { min-height: 64px; }
   }
 </style>
@@ -1926,6 +1932,8 @@
     html += '<div class="week-bar"><span class="week-range">今週 ' + wk.range + '</span></div>';
     html += '<div class="stat-chips"><span class="stat-chip">今週の完了 ' + doneThisWeek + ' 件</span><span class="stat-chip">今週の集中 ' + pomoThisWeek + ' 本</span></div>';
 
+    html += '<div class="review-columns">';
+
     html += '<div class="done-week"><div class="done-week-title">今週完了したチケット</div>';
     if (!doneThisWeekTasks.length) {
       html += '<div class="empty-state">今週完了したチケットはまだありません。</div>';
@@ -1948,7 +1956,8 @@
         '<span class="report-num">' + f.num + '</span><span class="report-name">' + f.name + '</span></div>' +
         '<textarea data-review-field="' + f.k + '" placeholder="' + f.ph + '">' + escapeHtml(rv[f.k]) + '</textarea></div>';
     });
-    html += '</div>';
+    html += '</div>'; // .report-grid
+    html += '</div>'; // .review-columns
 
     var history = Object.keys(state.reviews).filter(function (k) { return k !== wk.key; }).sort().reverse();
     if (history.length) {
@@ -2348,7 +2357,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202609012046").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202609021036").catch(function () {});
     });
   }
 </script>
