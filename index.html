@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202609021036">
-<link rel="icon" href="icon-192.png?v=202609021036">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609021036">
+<link rel="manifest" href="manifest.json?v=202609061524">
+<link rel="icon" href="icon-192.png?v=202609061524">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609061524">
 <style>
   :root {
     --ink: #1C2321;
@@ -1076,7 +1076,13 @@
     t.dueDate = newDate;
     if (!t.dueDate) { t.dueTime = null; t.reminderMin = null; t.repeatAnchorDate = null; }
     t.notifiedAt = null;
-    touch(t); save(); deferRender();
+    touch(t); save();
+    // ここではrender()しない: 日付inputはiOSではネイティブのピッカー(シート)を伴うため、
+    // 値が確定してもピッカー自体はまだ開いたまま(ユーザーがそのまま別の値を選び直すこともある)。
+    // changeの直後に要素を作り直すと、フォーカスの当たったinputごと消えることになり、
+    // iOSがそれを「ユーザーが操作を終えた」と解釈してピッカーを強制的に閉じてしまう
+    // (空欄の期限に今日の日付が一瞬入って即座に閉じる、という不具合として報告された)。
+    // 呼び出し側(bindMainEvents/bindModalEvents)でblur時に描画するようにしている。
   }
   function setDueTime(id, value) {
     var t = findTask(id); if (!t) return;
@@ -2071,6 +2077,9 @@
     });
     Array.prototype.forEach.call(main.querySelectorAll("[data-due-date]"), function (input) {
       input.addEventListener("change", function () { setDueDate(Number(input.dataset.dueDate), input.value); });
+      // blurまで再描画を待つ(iOSのネイティブ日付ピッカーが開いている間にinputごと
+      // 作り直すと、ピッカーが強制的に閉じてしまうため)。
+      input.addEventListener("blur", function () { deferRender(); });
     });
     function applyHourMin(id) {
       applyHourMinFor(id, main.querySelector('[data-due-hour="' + id + '"]'), main.querySelector('[data-due-min="' + id + '"]'));
@@ -2266,7 +2275,10 @@
       btn.addEventListener("click", function () { setStatus(id, btn.dataset.modalStatus); renderEditModal(); });
     });
     Array.prototype.forEach.call(overlay.querySelectorAll("[data-due-date]"), function (input) {
-      input.addEventListener("change", function () { setDueDate(Number(input.dataset.dueDate), input.value); deferRenderModal(); });
+      input.addEventListener("change", function () { setDueDate(Number(input.dataset.dueDate), input.value); });
+      // blurまで再描画を待つ(iOSのネイティブ日付ピッカーが開いている間にinputごと
+      // 作り直すと、ピッカーが強制的に閉じてしまうため)。
+      input.addEventListener("blur", function () { deferRenderModal(); });
     });
     function applyModalHourMin(hmId) {
       applyHourMinFor(hmId, overlay.querySelector('[data-due-hour="' + hmId + '"]'), overlay.querySelector('[data-due-min="' + hmId + '"]'));
@@ -2357,7 +2369,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202609021036").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202609061524").catch(function () {});
     });
   }
 </script>
