@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202609071032">
-<link rel="icon" href="icon-192.png?v=202609071032">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609071032">
+<link rel="manifest" href="manifest.json?v=202609071056">
+<link rel="icon" href="icon-192.png?v=202609071056">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609071056">
 <style>
   :root {
     --ink: #1C2321;
@@ -812,7 +812,42 @@
       var raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) { var seeded = seedState(); seeded.tasks.forEach(ensureGoogleFields); return seeded; }
       var parsed = JSON.parse(raw);
-      if (parsed.timer) parsed.timer.running = false;
+      // 動いていたタイマーを、無条件に「一時停止」扱いへ巻き戻すのではなく、実時間の
+      // 経過分だけ進めてから復元する(タブの再読み込みやPWAのバックグラウンド復帰で
+      // 一度も止めていないのにいつの間にか止まって見える、という不具合の対策)。
+      // 経過がそのフェーズの残り時間を超えていた場合だけ、離れていた間に1本分は
+      // 完了したものとして扱い(何時間分もまとめて完了扱いにはしない)、一時停止で止める。
+      if (parsed.timer) {
+        if (parsed.timer.running && parsed.updatedAt) {
+          var elapsedSec = Math.floor((Date.now() - parsed.updatedAt) / 1000);
+          if (elapsedSec > 0) {
+            var remainingAfter = parsed.timer.remaining - elapsedSec;
+            if (remainingAfter > 0) {
+              parsed.timer.remaining = remainingAfter;
+            } else {
+              var wasWork = parsed.timer.mode === "work";
+              if (wasWork) {
+                parsed.timer.sessionCount = (parsed.timer.sessionCount || 0) + 1;
+                if (!Array.isArray(parsed.pomodoroLog)) parsed.pomodoroLog = [];
+                parsed.pomodoroLog.push({ date: todayKey(), taskId: parsed.timer.taskId });
+                if (parsed.timer.taskId) {
+                  var caughtUpTask = (parsed.tasks || []).find(function (x) { return x.id === parsed.timer.taskId; });
+                  if (caughtUpTask) {
+                    caughtUpTask.donePomodoros = (caughtUpTask.donePomodoros || 0) + 1;
+                    if (caughtUpTask.status === "todo") caughtUpTask.status = "doing";
+                  }
+                }
+              }
+              var ts = parsed.timerSettings || { work: 25, brk: 5 };
+              parsed.timer.mode = wasWork ? "break" : "work";
+              parsed.timer.remaining = (parsed.timer.mode === "work" ? ts.work : ts.brk) * 60;
+              parsed.timer.running = false;
+            }
+          }
+        } else {
+          parsed.timer.running = false;
+        }
+      }
       if (!parsed.calCursor) parsed.calCursor = { year: new Date().getFullYear(), month: new Date().getMonth() };
       if (!("day" in parsed.calCursor)) parsed.calCursor.day = new Date().getDate();
       if (!parsed.calMode) parsed.calMode = "month";
@@ -2377,7 +2412,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202609071032").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202609071056").catch(function () {});
     });
   }
 </script>
