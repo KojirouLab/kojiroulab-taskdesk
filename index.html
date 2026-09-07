@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202609061524">
-<link rel="icon" href="icon-192.png?v=202609061524">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609061524">
+<link rel="manifest" href="manifest.json?v=202609071032">
+<link rel="icon" href="icon-192.png?v=202609071032">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609071032">
 <style>
   :root {
     --ink: #1C2321;
@@ -469,7 +469,15 @@
   .timer-controls { display: flex; gap: 8px; justify-content: center; margin-bottom: 20px; }
   .timer-settings { display: flex; gap: 14px; justify-content: center; font-size: 15.5px; color: var(--ink-soft); }
   .timer-settings label { display: flex; align-items: center; gap: 5px; }
-  .timer-settings input { width: 44px; background: var(--paper); border: 1px solid var(--line); border-radius: 2px; padding: 3px 6px; text-align: center; }
+  .timer-settings input {
+    width: 56px; background: var(--paper); border: 1px solid var(--line); border-radius: 2px;
+    padding: 3px 4px; text-align: center; -moz-appearance: textfield; appearance: textfield;
+  }
+  /* number inputのスピナー矢印を消す(数字2桁+矢印が固定幅の枠に収まらず、
+     2桁目が見切れて片方の数字しか見えなくなっていた)。 */
+  .timer-settings input::-webkit-outer-spin-button, .timer-settings input::-webkit-inner-spin-button {
+    -webkit-appearance: none; margin: 0;
+  }
 
   .tally-panel { background: var(--paper-sunken); border: 1px solid var(--line); border-radius: 6px; padding: 20px; }
   .tally-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
@@ -2369,7 +2377,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202609061524").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202609071032").catch(function () {});
     });
   }
 </script>
