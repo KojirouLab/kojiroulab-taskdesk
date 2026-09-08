@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202609071056">
-<link rel="icon" href="icon-192.png?v=202609071056">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609071056">
+<link rel="manifest" href="manifest.json?v=202609080928">
+<link rel="icon" href="icon-192.png?v=202609080928">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609080928">
 <style>
   :root {
     --ink: #1C2321;
@@ -263,6 +263,7 @@
     color: var(--ink-faint); font-size: 16.5px; padding: 26px 10px; text-align: center;
     border: 1px dashed var(--line); border-radius: 4px;
   }
+  .cal-add-btn { margin-top: 10px; }
 
   /* ---------- Matrix ---------- */
   .matrix { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -325,7 +326,10 @@
   }
   .cal-weekday.sun { color: var(--warn); }
   .cal-weekday.sat { color: var(--info); }
-  .cal-cell { background: var(--paper-raised); min-height: 96px; min-width: 0; padding: 6px 6px 8px; display: flex; flex-direction: column; gap: 4px; }
+  /* セルの余白部分をクリックすると、その日付でチケットを新規起票できる。
+     チップ自体は独自のcursor/hoverを持つので、そちらが優先されて見える。 */
+  .cal-cell { background: var(--paper-raised); min-height: 96px; min-width: 0; padding: 6px 6px 8px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
+  .cal-cell:hover { box-shadow: inset 0 0 0 1px var(--accent); }
   .cal-cell.out { background: var(--paper-sunken); }
   .cal-cell.out .cal-daynum { color: var(--ink-faint); }
   .cal-daynum { font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-soft); }
@@ -931,6 +935,23 @@
       googleEventId: null, googleSyncedAt: null, touchedAt: Date.now()
     });
     save(); render();
+  }
+  // カレンダーの日付(セルや「＋この日にチケットを追加」)から直接起票する。
+  // 期限日はすでに分かっているので受信箱を経由させず、最初からボードへ送った
+  // 状態(triaged:true)で作り、そのままタイトル入力できるよう編集モーダルを開く。
+  function addTaskAtDate(dateKey) {
+    if (!dateKey) return;
+    state.counter += 1;
+    var t = {
+      id: state.counter, no: "No." + String(state.counter).padStart(3, "0"),
+      title: "", note: "", createdAt: Date.now(), triaged: true,
+      urgent: false, important: false, status: "todo", estPomodoros: 2, donePomodoros: 0, completedAt: null,
+      dueDate: dateKey, dueTime: null, reminderMin: null, notifiedAt: null, repeat: null,
+      googleEventId: null, googleSyncedAt: null, touchedAt: Date.now()
+    };
+    state.tasks.unshift(t);
+    save(); render();
+    openEditModal(t.id);
   }
   function findTask(id) { return state.tasks.find(function (t) { return t.id === id; }); }
   function touch(t) { t.touchedAt = Date.now(); }
@@ -1787,7 +1808,7 @@
       var dKey = todayKey(d);
       var inMonth = d.getMonth() === month;
       var items = byDate[dKey] || [];
-      html += '<div class="cal-cell' + (inMonth ? "" : " out") + (dKey === todayStr ? " is-today" : "") + '">' +
+      html += '<div class="cal-cell' + (inMonth ? "" : " out") + (dKey === todayStr ? " is-today" : "") + '" data-cal-add="' + dKey + '">' +
         '<span class="cal-daynum">' + d.getDate() + '</span>';
       var shown = items.slice(0, 3);
       shown.forEach(function (t) { html += calChipHtml(t); });
@@ -1812,7 +1833,7 @@
       var d = new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate() + i);
       var dKey = todayKey(d);
       var items = byDate[dKey] || [];
-      html += '<div class="cal-cell cal-cell-tall' + (dKey === todayStr ? " is-today" : "") + '">' +
+      html += '<div class="cal-cell cal-cell-tall' + (dKey === todayStr ? " is-today" : "") + '" data-cal-add="' + dKey + '">' +
         '<span class="cal-daynum">' + (d.getMonth() + 1) + '/' + d.getDate() + '</span>';
       var shown = items.slice(0, 6);
       shown.forEach(function (t) { html += calChipHtml(t); });
@@ -1826,7 +1847,8 @@
     var ref = calRefDate();
     var dKey = todayKey(ref);
     var items = calByDateMap(dKey, dKey)[dKey] || [];
-    if (!items.length) return '<div class="empty-state">この日に期限のあるチケットはありません。</div>';
+    var addBtn = '<button type="button" class="btn btn-sm cal-add-btn" data-cal-add-btn="' + dKey + '">＋ この日にチケットを追加</button>';
+    if (!items.length) return '<div class="empty-state">この日に期限のあるチケットはありません。</div>' + addBtn;
     return items.map(function (t) {
       if (t.virtual) {
         // まだ発行されていない先の回のプレビュー。編集も完了も削除もできない
@@ -1846,7 +1868,7 @@
         (t.status !== "done" ? '<button class="btn btn-sm" data-complete="' + t.id + '">完了 ✓</button>' : "") +
         '<button class="btn btn-sm" data-focus-task="' + t.id + '">集中する</button>' +
         '<button class="btn-ghost" data-del="' + t.id + '">削除</button></div></div>';
-    }).join("");
+    }).join("") + addBtn;
   }
   function renderCalendar() {
     var html = viewHead("03 · TIME-BOXING", "カレンダー", "チケットに日付と時刻の期限を置く。通知を設定すれば、指定した分前(または期限ちょうど)にこの卓上から知らせる。");
@@ -2168,6 +2190,18 @@
         openEditModal(Number(el.dataset.calEdit));
       });
     });
+    // 月表示・週表示のセルの、チップが無い余白部分をクリックしたら、その日付で
+    // 新規チケットを直接起票する(既存チップ自体のクリックは上のdata-cal-editが
+    // 別途処理するので、ここでは既存チップ上のクリックだけ弾く)。
+    Array.prototype.forEach.call(main.querySelectorAll("[data-cal-add]"), function (cell) {
+      cell.addEventListener("click", function (e) {
+        if (e.target.closest(".cal-chip, .cal-more")) return;
+        addTaskAtDate(cell.dataset.calAdd);
+      });
+    });
+    Array.prototype.forEach.call(main.querySelectorAll("[data-cal-add-btn]"), function (btn) {
+      btn.addEventListener("click", function () { addTaskAtDate(btn.dataset.calAddBtn); });
+    });
 
     // Kanban drag & drop
     Array.prototype.forEach.call(main.querySelectorAll("[data-drag]"), function (card) {
@@ -2412,7 +2446,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202609071056").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202609080928").catch(function () {});
     });
   }
 </script>
