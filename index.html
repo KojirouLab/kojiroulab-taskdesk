@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202609080928">
-<link rel="icon" href="icon-192.png?v=202609080928">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609080928">
+<link rel="manifest" href="manifest.json?v=202609110943">
+<link rel="icon" href="icon-192.png?v=202609110943">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609110943">
 <style>
   :root {
     --ink: #1C2321;
@@ -1181,7 +1181,7 @@
   var QUAD_META = {
     1: { title: "即応", sub: "緊急 × 重要", cls: "pill-warn" },
     2: { title: "計画", sub: "重要のみ", cls: "pill-info" },
-    3: { title: "委任", sub: "緊急のみ", cls: "pill-amber" },
+    3: { title: "即処理", sub: "緊急のみ", cls: "pill-amber" },
     4: { title: "保留", sub: "どちらでもない", cls: "pill-muted" }
   };
 
@@ -2446,7 +2446,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202609080928").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202609110943").catch(function () {});
     });
   }
 </script>
