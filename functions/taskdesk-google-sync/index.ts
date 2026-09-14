@@ -102,8 +102,15 @@ function eventDateFields(startDate: string, startTime: string | null) {
   if (startTime) {
     // ローカル時刻文字列をそのまま渡し、timeZoneで明示する
     // (timeZoneを省略するとGoogle Calendar APIが400を返す)。
-    const start = { dateTime: `${startDate}T${startTime}:00`, timeZone: TIME_ZONE };
-    const end = { dateTime: `${startDate}T${startTime}:00`, timeZone: TIME_ZONE }; // 30分イベントにする
+    // date: nullも明示する — PATCHでstart/endオブジェクトは指定したキーだけの
+    // 差分更新ではなく、Calendar APIは前回のdateフィールドを残したまま新しく
+    // dateTimeを追加しようとして「date/dateTimeが両方入った不正な状態」になり、
+    // "Invalid start time" で400を返すことがあった(全日イベント→時刻ありに
+    // 切り替えた時に発生)。nullを送ることで明示的に消す。
+    const start: { dateTime: string; timeZone: string; date: null } =
+      { dateTime: `${startDate}T${startTime}:00`, timeZone: TIME_ZONE, date: null };
+    const end: { dateTime: string; timeZone: string; date: null } =
+      { dateTime: `${startDate}T${startTime}:00`, timeZone: TIME_ZONE, date: null }; // 30分イベントにする
     const [h, m] = startTime.split(':').map(Number);
     const endMinutes = h * 60 + m + 30;
     const endH = Math.floor(endMinutes / 60) % 24;
@@ -116,7 +123,14 @@ function eventDateFields(startDate: string, startTime: string | null) {
     dt.setUTCDate(dt.getUTCDate() + 1);
     return dt.toISOString().slice(0, 10);
   };
-  return { start: { date: startDate }, end: { date: addDay(startDate) } };
+  // 同じ理由でdateTime/timeZoneも明示的にnullにする(時刻あり→無しに切り替えた時、
+  // 前回のdateTimeが残ったままdateも入る不正な状態になっていた。今回の実際の
+  // 不具合はこちら方向: 楽天タウンミーティングの時刻を消して全日予定に戻した
+  // チケットの同期が"Invalid start time"で毎回失敗していた)。
+  return {
+    start: { date: startDate, dateTime: null, timeZone: null },
+    end: { date: addDay(startDate), dateTime: null, timeZone: null },
+  };
 }
 
 // Deno Edge Functionの実行環境はUTC基準で動いているため、Date#getHours()等の
