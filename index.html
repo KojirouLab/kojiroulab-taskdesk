@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202609110943">
-<link rel="icon" href="icon-192.png?v=202609110943">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609110943">
+<link rel="manifest" href="manifest.json?v=202609141357">
+<link rel="icon" href="icon-192.png?v=202609141357">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609141357">
 <style>
   :root {
     --ink: #1C2321;
@@ -242,7 +242,17 @@
     border-radius: 2px; padding: 5px 10px; font-size: 15.5px; cursor: pointer; font-weight: 600;
   }
   .flag-toggle.on-urgent { background: var(--warn-soft); border-color: transparent; color: var(--warn); }
-  .flag-toggle.on-important { background: var(--info-soft); border-color: transparent; color: var(--info); }
+
+  /* 重要度A/B/C(単一選択)。Aが最も重要 → Cが最も軽い、という重みをそのまま色の
+     強さに対応させる(A=はっきり強調、B=中間、C=控えめ)。 */
+  .priority-group { display: inline-flex; gap: 3px; }
+  .priority-btn {
+    border: 1px solid var(--line); background: var(--paper); color: var(--ink-soft);
+    border-radius: 2px; width: 30px; height: 30px; font-size: 14px; cursor: pointer; font-weight: 700;
+  }
+  .priority-btn.priority-A.on { background: var(--warn-soft); border-color: transparent; color: var(--warn); }
+  .priority-btn.priority-B.on { background: var(--info-soft); border-color: transparent; color: var(--info); }
+  .priority-btn.priority-C.on { background: var(--paper-sunken); border-color: transparent; color: var(--ink-soft); }
 
   .due-group { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .due-field { display: inline-flex; align-items: center; gap: 5px; font-size: 15px; color: var(--ink-soft); }
@@ -785,12 +795,12 @@
       calCursor: { year: new Date().getFullYear(), month: new Date().getMonth(), day: new Date().getDate() },
       calMode: "month",
       tasks: [
-        { id: 1, no: "No.001", title: "牡蠣の積み込みプランを来週分アップデート", note: "女川発/仙台発ルートの順番を再確認する", createdAt: now - day * 3, triaged: true, urgent: true, important: true, status: "doing", estPomodoros: 3, donePomodoros: 2, completedAt: null, dueDate: todayKey(new Date(now + day)), dueTime: "17:00", reminderMin: 30, notifiedAt: null, repeat: null },
-        { id: 2, no: "No.002", title: "タスクカレンダーのGoogle連携 Phase2を設計", note: "Phase1完了分の反省を踏まえて構成を練る", createdAt: now - day * 2, triaged: true, urgent: false, important: true, status: "todo", estPomodoros: 4, donePomodoros: 0, completedAt: null, dueDate: todayKey(new Date(now + day * 10)), dueTime: null, reminderMin: null, notifiedAt: null, repeat: null },
-        { id: 3, no: "No.003", title: "経費精算をまとめて提出する", note: "", createdAt: now - day * 4, triaged: true, urgent: true, important: false, status: "todo", estPomodoros: 1, donePomodoros: 0, completedAt: null, dueDate: todayKey(new Date(now + day * 2)), dueTime: "12:00", reminderMin: 60, notifiedAt: null, repeat: "weekly" },
-        { id: 4, no: "No.004", title: "使っていないSupabaseプロジェクトを整理", note: "検証用に作った古いものが残っている", createdAt: now - day * 6, triaged: true, urgent: false, important: false, status: "todo", estPomodoros: 1, donePomodoros: 0, completedAt: null, dueDate: null, dueTime: null, reminderMin: null, notifiedAt: null, repeat: null },
-        { id: 5, no: "No.005", title: "受発注システムのLINE通知の文言を最終確認", note: "締切リマインドの言い回しが硬すぎないか見直す", createdAt: now - day, triaged: false, urgent: null, important: null, status: "todo", estPomodoros: 2, donePomodoros: 0, completedAt: null, dueDate: null, dueTime: null, reminderMin: null, notifiedAt: null, repeat: null },
-        { id: 6, no: "No.006", title: "月次の在庫棚卸チェックリストを更新", note: "牡蠣の在庫管理フローに合わせて項目を見直す", createdAt: now - day * 5, triaged: true, urgent: true, important: false, status: "doing", estPomodoros: 1, donePomodoros: 0, completedAt: null, dueDate: todayKey(new Date(now - day * 2)), dueTime: null, reminderMin: null, notifiedAt: null, repeat: "daily" }
+        { id: 1, no: "No.001", title: "牡蠣の積み込みプランを来週分アップデート", note: "女川発/仙台発ルートの順番を再確認する", createdAt: now - day * 3, triaged: true, urgent: true, priority: "A", status: "doing", estPomodoros: 3, donePomodoros: 2, completedAt: null, dueDate: todayKey(new Date(now + day)), dueTime: "17:00", reminderMin: 30, notifiedAt: null, repeat: null },
+        { id: 2, no: "No.002", title: "タスクカレンダーのGoogle連携 Phase2を設計", note: "Phase1完了分の反省を踏まえて構成を練る", createdAt: now - day * 2, triaged: true, urgent: false, priority: "A", status: "todo", estPomodoros: 4, donePomodoros: 0, completedAt: null, dueDate: todayKey(new Date(now + day * 10)), dueTime: null, reminderMin: null, notifiedAt: null, repeat: null },
+        { id: 3, no: "No.003", title: "経費精算をまとめて提出する", note: "", createdAt: now - day * 4, triaged: true, urgent: true, priority: null, status: "todo", estPomodoros: 1, donePomodoros: 0, completedAt: null, dueDate: todayKey(new Date(now + day * 2)), dueTime: "12:00", reminderMin: 60, notifiedAt: null, repeat: "weekly" },
+        { id: 4, no: "No.004", title: "使っていないSupabaseプロジェクトを整理", note: "検証用に作った古いものが残っている", createdAt: now - day * 6, triaged: true, urgent: false, priority: null, status: "todo", estPomodoros: 1, donePomodoros: 0, completedAt: null, dueDate: null, dueTime: null, reminderMin: null, notifiedAt: null, repeat: null },
+        { id: 5, no: "No.005", title: "受発注システムのLINE通知の文言を最終確認", note: "締切リマインドの言い回しが硬すぎないか見直す", createdAt: now - day, triaged: false, urgent: null, priority: null, status: "todo", estPomodoros: 2, donePomodoros: 0, completedAt: null, dueDate: null, dueTime: null, reminderMin: null, notifiedAt: null, repeat: null },
+        { id: 6, no: "No.006", title: "月次の在庫棚卸チェックリストを更新", note: "牡蠣の在庫管理フローに合わせて項目を見直す", createdAt: now - day * 5, triaged: true, urgent: true, priority: null, status: "doing", estPomodoros: 1, donePomodoros: 0, completedAt: null, dueDate: todayKey(new Date(now - day * 2)), dueTime: null, reminderMin: null, notifiedAt: null, repeat: "daily" }
       ],
       pomodoroLog: [
         { date: todayKey(new Date(now - day)), taskId: 1 },
@@ -863,6 +873,9 @@
         if (!("reminderMin" in t)) t.reminderMin = null;
         if (!("notifiedAt" in t)) t.notifiedAt = null;
         if (!("repeat" in t)) t.repeat = null;
+        // 「重要」の二択(boolean)を廃止してA/B/Cの3段階(t.priority)に置き換えた。
+        // 旧データはimportant:trueだったものをA(重要寄りの上位)へ寄せる。
+        if (!("priority" in t)) t.priority = t.important ? "A" : null;
         ensureGoogleFields(t);
       });
       Object.keys(parsed.reviews || {}).forEach(function (k) {
@@ -930,7 +943,7 @@
     state.tasks.unshift({
       id: state.counter, no: "No." + String(state.counter).padStart(3, "0"),
       title: title, note: "", createdAt: Date.now(), triaged: false,
-      urgent: null, important: null, status: "todo", estPomodoros: 2, donePomodoros: 0, completedAt: null,
+      urgent: null, priority: null, status: "todo", estPomodoros: 2, donePomodoros: 0, completedAt: null,
       dueDate: null, dueTime: null, reminderMin: null, notifiedAt: null, repeat: null,
       googleEventId: null, googleSyncedAt: null, touchedAt: Date.now()
     });
@@ -945,7 +958,7 @@
     var t = {
       id: state.counter, no: "No." + String(state.counter).padStart(3, "0"),
       title: "", note: "", createdAt: Date.now(), triaged: true,
-      urgent: false, important: false, status: "todo", estPomodoros: 2, donePomodoros: 0, completedAt: null,
+      urgent: false, priority: null, status: "todo", estPomodoros: 2, donePomodoros: 0, completedAt: null,
       dueDate: dateKey, dueTime: null, reminderMin: null, notifiedAt: null, repeat: null,
       googleEventId: null, googleSyncedAt: null, touchedAt: Date.now()
     };
@@ -959,13 +972,18 @@
     var t = findTask(id); if (!t) return;
     t[flag] = !t[flag];
     if (t.urgent === null) t.urgent = false;
-    if (t.important === null) t.important = false;
+    touch(t); save(); render();
+  }
+  // A/B/Cは単一選択。すでに選ばれている文字をもう一度押すと解除する。
+  function setPriority(id, letter) {
+    var t = findTask(id); if (!t) return;
+    t.priority = (t.priority === letter) ? null : letter;
+    if (t.urgent === null) t.urgent = false;
     touch(t); save(); render();
   }
   function sendToBoard(id) {
     var t = findTask(id); if (!t) return;
     if (t.urgent === null) t.urgent = false;
-    if (t.important === null) t.important = false;
     t.triaged = true; touch(t); save(); render();
   }
   function deleteTask(id) {
@@ -1116,7 +1134,7 @@
     state.tasks.unshift({
       id: state.counter, no: "No." + String(state.counter).padStart(3, "0"),
       title: t.title, note: t.note, createdAt: Date.now(), triaged: t.triaged,
-      urgent: t.urgent, important: t.important, status: "todo",
+      urgent: t.urgent, priority: t.priority, status: "todo",
       estPomodoros: t.estPomodoros, donePomodoros: 0, completedAt: null,
       dueDate: nextKey, dueTime: t.dueTime, reminderMin: t.reminderMin, notifiedAt: null,
       repeat: t.repeat, repeatWeekdays: t.repeatWeekdays || null, repeatAnchorDate: nextKey,
@@ -1172,10 +1190,14 @@
     setDueTime(id, (hourEl.value || "00") + ":" + (minEl.value || "00"));
   }
 
+  // 重要度はA/B/Cの3段階(t.priority)。マトリクス上の「重要かどうか」はA・Bを重要、
+  // Cを重要でない扱いにする。
+  function isImportant(t) { return t.priority === "A" || t.priority === "B"; }
   function quadrantOf(t) {
-    if (t.urgent && t.important) return 1;
-    if (!t.urgent && t.important) return 2;
-    if (t.urgent && !t.important) return 3;
+    var imp = isImportant(t);
+    if (t.urgent && imp) return 1;
+    if (!t.urgent && imp) return 2;
+    if (t.urgent && !imp) return 3;
     return 4;
   }
   var QUAD_META = {
@@ -1612,8 +1634,13 @@
   }
 
   function ticketFlagsHtml(t) {
-    return '<button class="flag-toggle' + (t.urgent ? " on-urgent" : "") + '" data-flag="urgent" data-id="' + t.id + '">緊急' + (t.urgent ? " ✓" : "") + '</button>' +
-      '<button class="flag-toggle' + (t.important ? " on-important" : "") + '" data-flag="important" data-id="' + t.id + '">重要' + (t.important ? " ✓" : "") + '</button>';
+    var html = '<button class="flag-toggle' + (t.urgent ? " on-urgent" : "") + '" data-flag="urgent" data-id="' + t.id + '">緊急' + (t.urgent ? " ✓" : "") + '</button>';
+    html += '<span class="priority-group">';
+    ["A", "B", "C"].forEach(function (letter) {
+      html += '<button class="priority-btn priority-' + letter + (t.priority === letter ? " on" : "") + '" data-priority="' + letter + '" data-id="' + t.id + '">' + letter + '</button>';
+    });
+    html += '</span>';
+    return html;
   }
 
   // iOSのネイティブ<input type="time">は、時・分の片方が確定した時点でピッカーごと
@@ -2122,6 +2149,9 @@
     Array.prototype.forEach.call(main.querySelectorAll("[data-flag]"), function (btn) {
       btn.addEventListener("click", function () { toggleFlag(Number(btn.dataset.id), btn.dataset.flag); });
     });
+    Array.prototype.forEach.call(main.querySelectorAll("[data-priority]"), function (btn) {
+      btn.addEventListener("click", function () { setPriority(Number(btn.dataset.id), btn.dataset.priority); });
+    });
     Array.prototype.forEach.call(main.querySelectorAll("[data-send]"), function (btn) {
       btn.addEventListener("click", function () { sendToBoard(Number(btn.dataset.send)); });
     });
@@ -2348,6 +2378,9 @@
     Array.prototype.forEach.call(overlay.querySelectorAll("[data-flag]"), function (btn) {
       btn.addEventListener("click", function () { toggleFlag(Number(btn.dataset.id), btn.dataset.flag); renderEditModal(); });
     });
+    Array.prototype.forEach.call(overlay.querySelectorAll("[data-priority]"), function (btn) {
+      btn.addEventListener("click", function () { setPriority(Number(btn.dataset.id), btn.dataset.priority); renderEditModal(); });
+    });
     Array.prototype.forEach.call(overlay.querySelectorAll("[data-modal-status]"), function (btn) {
       btn.addEventListener("click", function () { setStatus(id, btn.dataset.modalStatus); renderEditModal(); });
     });
@@ -2446,7 +2479,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202609110943").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202609141357").catch(function () {});
     });
   }
 </script>
