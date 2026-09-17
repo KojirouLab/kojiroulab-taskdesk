@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202609141357">
-<link rel="icon" href="icon-192.png?v=202609141357">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609141357">
+<link rel="manifest" href="manifest.json?v=202609171458">
+<link rel="icon" href="icon-192.png?v=202609171458">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609171458">
 <style>
   :root {
     --ink: #1C2321;
@@ -366,6 +366,9 @@
      伝わるよう、薄く・破線にしてhoverの反応も付けない。 */
   .cal-chip-virtual { opacity: .5; border: 1px dashed var(--line); background: transparent; cursor: default; }
   .cal-more { font-size: 11px; color: var(--ink-faint); padding-left: 2px; }
+  .cal-overdue-section { margin-bottom: 18px; padding: 12px; background: var(--warn-soft); border: 1px solid var(--warn); border-radius: 6px; }
+  .cal-overdue-title { font-size: 14px; font-weight: 700; color: var(--warn); letter-spacing: .02em; margin-bottom: 10px; }
+  .cal-overdue-section .ticket:last-child { margin-bottom: 0; }
   .unscheduled { margin-top: 24px; }
   .unscheduled-title { font-size: 15.5px; font-weight: 700; color: var(--ink-soft); letter-spacing: .04em; margin-bottom: 10px; text-transform: uppercase; }
   .unscheduled-row {
@@ -1870,32 +1873,42 @@
     html += '</div>';
     return html;
   }
+  function calDayTicketHtml(t) {
+    if (t.virtual) {
+      // まだ発行されていない先の回のプレビュー。編集も完了も削除もできない
+      // (実体が無いので)。前回分が完了すると、この日のものが本物として発行される。
+      return '<div class="ticket ticket-virtual"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' +
+        '<span class="pill pill-muted">↻ 次回予定</span></div>' +
+        '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
+        '<p class="ticket-note">まだ実際のチケットではありません。前回分が完了すると発行されます。</p></div>';
+    }
+    var meta = QUAD_META[quadrantOf(t)];
+    return '<div class="ticket ticket-clickable status-' + t.status + '" data-cal-edit="' + t.id + '"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' +
+      '<span class="pill ' + meta.cls + '">' + meta.title + '</span>' + repeatPillHtml(t) + '</div>' +
+      '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
+      (t.note ? '<p class="ticket-note">' + escapeHtml(t.note) + '</p>' : "") +
+      '<div class="ticket-actions">' + (t.status !== "done" ? '<span class="pomo-dots" title="ポモドーロ進捗">' + pomoDots(t) + '</span>' : "") +
+      ticketDueHtml(t) + '<span class="spacer"></span>' +
+      (t.status !== "done" ? '<button class="btn btn-sm" data-complete="' + t.id + '">完了 ✓</button>' : "") +
+      '<button class="btn btn-sm" data-focus-task="' + t.id + '">集中する</button>' +
+      '<button class="btn-ghost" data-del="' + t.id + '">削除</button></div></div>';
+  }
   function calDayListHtml() {
     var ref = calRefDate();
     var dKey = todayKey(ref);
     var items = calByDateMap(dKey, dKey)[dKey] || [];
+    var overdue = state.tasks.filter(function (t) {
+      return t.triaged && t.dueDate && t.dueDate < dKey && t.status !== "done";
+    }).sort(compareByDue);
     var addBtn = '<button type="button" class="btn btn-sm cal-add-btn" data-cal-add-btn="' + dKey + '">＋ この日にチケットを追加</button>';
-    if (!items.length) return '<div class="empty-state">この日に期限のあるチケットはありません。</div>' + addBtn;
-    return items.map(function (t) {
-      if (t.virtual) {
-        // まだ発行されていない先の回のプレビュー。編集も完了も削除もできない
-        // (実体が無いので)。前回分が完了すると、この日のものが本物として発行される。
-        return '<div class="ticket ticket-virtual"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' +
-          '<span class="pill pill-muted">↻ 次回予定</span></div>' +
-          '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
-          '<p class="ticket-note">まだ実際のチケットではありません。前回分が完了すると発行されます。</p></div>';
-      }
-      var meta = QUAD_META[quadrantOf(t)];
-      return '<div class="ticket ticket-clickable status-' + t.status + '" data-cal-edit="' + t.id + '"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' +
-        '<span class="pill ' + meta.cls + '">' + meta.title + '</span>' + repeatPillHtml(t) + '</div>' +
-        '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
-        (t.note ? '<p class="ticket-note">' + escapeHtml(t.note) + '</p>' : "") +
-        '<div class="ticket-actions">' + (t.status !== "done" ? '<span class="pomo-dots" title="ポモドーロ進捗">' + pomoDots(t) + '</span>' : "") +
-        ticketDueHtml(t) + '<span class="spacer"></span>' +
-        (t.status !== "done" ? '<button class="btn btn-sm" data-complete="' + t.id + '">完了 ✓</button>' : "") +
-        '<button class="btn btn-sm" data-focus-task="' + t.id + '">集中する</button>' +
-        '<button class="btn-ghost" data-del="' + t.id + '">削除</button></div></div>';
-    }).join("") + addBtn;
+    var html = "";
+    if (overdue.length) {
+      html += '<div class="cal-overdue-section"><div class="cal-overdue-title">⚠ 期限超過・未完了(' + overdue.length + '件)</div>' +
+        overdue.map(calDayTicketHtml).join("") + '</div>';
+    }
+    if (!items.length) html += '<div class="empty-state">この日に期限のあるチケットはありません。</div>';
+    else html += items.map(calDayTicketHtml).join("");
+    return html + addBtn;
   }
   function renderCalendar() {
     var html = viewHead("03 · TIME-BOXING", "カレンダー", "チケットに日付と時刻の期限を置く。通知を設定すれば、指定した分前(または期限ちょうど)にこの卓上から知らせる。");
@@ -2479,7 +2492,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202609141357").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202609171458").catch(function () {});
     });
   }
 </script>
