@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202609171458">
-<link rel="icon" href="icon-192.png?v=202609171458">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609171458">
+<link rel="manifest" href="manifest.json?v=202609171520">
+<link rel="icon" href="icon-192.png?v=202609171520">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609171520">
 <style>
   :root {
     --ink: #1C2321;
@@ -538,6 +538,8 @@
   .history-grid strong { display: block; font-size: 14px; color: var(--ink-faint); margin-bottom: 2px; }
 
   .pill-repeat { background: var(--accent-soft); color: var(--accent-ink); }
+  .pill-period { background: var(--paper-sunken); color: var(--ink-soft); font-family: var(--font-mono); }
+  .cal-chip-period { opacity: .72; }
 
   /* ---------- Responsive ---------- */
   @media (max-width: 860px) {
@@ -872,6 +874,7 @@
       if (!Array.isArray(parsed.pendingGoogleDeletes)) parsed.pendingGoogleDeletes = [];
       (parsed.tasks || []).forEach(function (t) {
         if (!("dueDate" in t)) t.dueDate = null;
+        if (!("startDate" in t)) t.startDate = null;
         if (!("dueTime" in t)) t.dueTime = null;
         if (!("reminderMin" in t)) t.reminderMin = null;
         if (!("notifiedAt" in t)) t.notifiedAt = null;
@@ -947,7 +950,7 @@
       id: state.counter, no: "No." + String(state.counter).padStart(3, "0"),
       title: title, note: "", createdAt: Date.now(), triaged: false,
       urgent: null, priority: null, status: "todo", estPomodoros: 2, donePomodoros: 0, completedAt: null,
-      dueDate: null, dueTime: null, reminderMin: null, notifiedAt: null, repeat: null,
+      startDate: null, dueDate: null, dueTime: null, reminderMin: null, notifiedAt: null, repeat: null,
       googleEventId: null, googleSyncedAt: null, touchedAt: Date.now()
     });
     save(); render();
@@ -962,7 +965,7 @@
       id: state.counter, no: "No." + String(state.counter).padStart(3, "0"),
       title: "", note: "", createdAt: Date.now(), triaged: true,
       urgent: false, priority: null, status: "todo", estPomodoros: 2, donePomodoros: 0, completedAt: null,
-      dueDate: dateKey, dueTime: null, reminderMin: null, notifiedAt: null, repeat: null,
+      startDate: null, dueDate: dateKey, dueTime: null, reminderMin: null, notifiedAt: null, repeat: null,
       googleEventId: null, googleSyncedAt: null, touchedAt: Date.now()
     };
     state.tasks.unshift(t);
@@ -1139,7 +1142,7 @@
       title: t.title, note: t.note, createdAt: Date.now(), triaged: t.triaged,
       urgent: t.urgent, priority: t.priority, status: "todo",
       estPomodoros: t.estPomodoros, donePomodoros: 0, completedAt: null,
-      dueDate: nextKey, dueTime: t.dueTime, reminderMin: t.reminderMin, notifiedAt: null,
+      startDate: null, dueDate: nextKey, dueTime: t.dueTime, reminderMin: t.reminderMin, notifiedAt: null,
       repeat: t.repeat, repeatWeekdays: t.repeatWeekdays || null, repeatAnchorDate: nextKey,
       googleEventId: null, googleSyncedAt: null, touchedAt: Date.now()
     });
@@ -1159,7 +1162,8 @@
       t.repeatAnchorDate = newDate; // 基準日がまだ無い(繰り返しを設定した直後など)場合は素直に追従
     }
     t.dueDate = newDate;
-    if (!t.dueDate) { t.dueTime = null; t.reminderMin = null; t.repeatAnchorDate = null; }
+    if (!t.dueDate) { t.dueTime = null; t.reminderMin = null; t.repeatAnchorDate = null; t.startDate = null; }
+    else if (t.startDate && t.startDate > t.dueDate) t.startDate = null; // 開始日が期限より後になったら開始日は捨てる
     t.notifiedAt = null;
     touch(t); save();
     // ここではrender()しない: 日付inputはiOSではネイティブのピッカー(シート)を伴うため、
@@ -1168,6 +1172,16 @@
     // iOSがそれを「ユーザーが操作を終えた」と解釈してピッカーを強制的に閉じてしまう
     // (空欄の期限に今日の日付が一瞬入って即座に閉じる、という不具合として報告された)。
     // 呼び出し側(bindMainEvents/bindModalEvents)でblur時に描画するようにしている。
+  }
+  // 「この日からこの日までにやる」という幅を持たせたい時の開始日。期限(終了日)は
+  // 必ず要る前提(開始日だけ設定して期限が無い、という状態は作らせない)。
+  function setStartDate(id, value) {
+    var t = findTask(id); if (!t) return;
+    var newDate = value || null;
+    if (newDate && t.dueDate && newDate > t.dueDate) t.dueDate = newDate; // 期限より後にしたら期限ごと押し出す
+    t.startDate = newDate;
+    touch(t); save();
+    // setDueDateと同様、blurまで再描画を待つ(呼び出し側で処理)。
   }
   function setDueTime(id, value) {
     var t = findTask(id); if (!t) return;
@@ -1658,8 +1672,11 @@
     return html;
   }
   function ticketDueHtml(t) {
-    var html = '<span class="due-group' + (isOverdue(t) ? " overdue" : "") + '">' +
-      '<label class="due-field"><span>期限</span><input type="date" data-due-date="' + t.id + '" value="' + (t.dueDate || "") + '"></label>';
+    var html = '<span class="due-group' + (isOverdue(t) ? " overdue" : "") + '">';
+    if (t.dueDate) {
+      html += '<label class="due-field"><span>開始日</span><input type="date" data-start-date="' + t.id + '" value="' + (t.startDate || "") + '" max="' + t.dueDate + '"></label>';
+    }
+    html += '<label class="due-field"><span>期限</span><input type="date" data-due-date="' + t.id + '" value="' + (t.dueDate || "") + '"' + (t.startDate ? ' min="' + t.startDate + '"' : "") + '></label>';
     if (t.dueDate) {
       var hh = t.dueTime ? t.dueTime.split(":")[0] : "";
       var mm = t.dueTime ? t.dueTime.split(":")[1] : "";
@@ -1689,6 +1706,15 @@
     }
     return '<span class="pill pill-repeat">↻ ' + label + '</span>';
   }
+  function dateKeyLabel(key) {
+    var d = new Date(key + "T00:00:00");
+    return (d.getMonth() + 1) + "/" + d.getDate();
+  }
+  // 開始日〜期限の幅を持つチケットだと分かるよう、繰り返しピルと並べて出す短い表示。
+  function periodPillHtml(t) {
+    if (!t.startDate || !t.dueDate || t.startDate >= t.dueDate) return "";
+    return '<span class="pill pill-period">' + dateKeyLabel(t.startDate) + '→' + dateKeyLabel(t.dueDate) + '</span>';
+  }
 
   function renderInbox() {
     var untriaged = state.tasks.filter(function (t) { return !t.triaged; });
@@ -1700,7 +1726,7 @@
       html += '<div class="empty-state">受信箱は空です。頭の中のことを書き出しましょう。</div>';
     } else {
       html += untriaged.map(function (t) {
-        return '<div class="ticket ticket-clickable" data-cal-edit="' + t.id + '"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' + repeatPillHtml(t) + '</div>' +
+        return '<div class="ticket ticket-clickable" data-cal-edit="' + t.id + '"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' + repeatPillHtml(t) + periodPillHtml(t) + '</div>' +
           '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
           (t.note ? '<p class="ticket-note">' + escapeHtml(t.note) + '</p>' : "") +
           '<div class="ticket-actions">' + ticketFlagsHtml(t) + ticketDueHtml(t) +
@@ -1727,7 +1753,7 @@
         html += '<div class="empty-state">ここにはまだチケットがありません。</div>';
       } else {
         html += items.map(function (t) {
-          return '<div class="ticket ticket-clickable" data-cal-edit="' + t.id + '"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' + repeatPillHtml(t) + '</div>' +
+          return '<div class="ticket ticket-clickable" data-cal-edit="' + t.id + '"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' + repeatPillHtml(t) + periodPillHtml(t) + '</div>' +
             '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
             '<div class="ticket-actions">' + ticketFlagsHtml(t) + ticketDueHtml(t) +
             '<span class="spacer"></span><button class="btn btn-sm" data-complete="' + t.id + '">完了 ✓</button>' +
@@ -1766,11 +1792,28 @@
     }
     return dates;
   }
+  // 開始日が設定されているチケットは、開始日〜期限の全日にわたって表示する。
+  function dateKeysInRange(startKey, endKey) {
+    var keys = [];
+    var cur = new Date(startKey + "T00:00:00");
+    var end = new Date(endKey + "T00:00:00");
+    for (var i = 0; i < 60 && cur <= end; i++) {
+      keys.push(todayKey(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+    return keys;
+  }
   function calByDateMap(rangeStartKey, rangeEndKey) {
     var byDate = {};
     var activeTasks = state.tasks.filter(function (t) { return t.triaged && t.dueDate; });
     activeTasks.forEach(function (t) {
-      (byDate[t.dueDate] = byDate[t.dueDate] || []).push(t);
+      if (t.startDate && t.startDate < t.dueDate) {
+        dateKeysInRange(t.startDate, t.dueDate).forEach(function (k) {
+          (byDate[k] = byDate[k] || []).push(t);
+        });
+      } else {
+        (byDate[t.dueDate] = byDate[t.dueDate] || []).push(t);
+      }
     });
     if (rangeStartKey && rangeEndKey) {
       activeTasks.filter(function (t) { return t.repeat && t.status !== "done"; }).forEach(function (t) {
@@ -1787,9 +1830,12 @@
     });
     return byDate;
   }
-  function calChipHtml(t) {
+  function calChipHtml(t, dKey) {
     var cls = isOverdue(t) ? "overdue" : "q" + quadrantOf(t);
     var timeLabel = t.dueTime ? " " + t.dueTime : "";
+    // 開始日〜期限の期間中で、その期限当日ではない(まだ続いている)日のチップだと
+    // 分かるよう「▸」を付けて区別する。
+    var isPeriodDay = dKey && t.startDate && dKey !== t.dueDate;
     // 時刻とタイトルを1行に並べてnowrap+ellipsisさせると、狭い列では「17:00 」だけで
     // 幅を使い切ってしまいタイトルがほぼ見えなくなる。時刻はタイトルの上に小さく別行で
     // 出し、タイトル側は列いっぱいを使って省略できるようにする。
@@ -1800,9 +1846,9 @@
         (t.dueTime ? '<span class="cal-chip-time">' + t.dueTime + '</span>' : "") +
         '<span class="cal-chip-title">↻ ' + escapeHtml(t.title) + '</span></span>';
     }
-    return '<button type="button" class="cal-chip ' + cls + (t.status === "done" ? " done" : "") + '" data-cal-edit="' + t.id + '" title="' + escapeHtml(t.no + " " + t.title + timeLabel) + '">' +
+    return '<button type="button" class="cal-chip ' + cls + (t.status === "done" ? " done" : "") + (isPeriodDay ? " cal-chip-period" : "") + '" data-cal-edit="' + t.id + '" title="' + escapeHtml(t.no + " " + t.title + timeLabel) + '">' +
       (t.dueTime ? '<span class="cal-chip-time">' + t.dueTime + '</span>' : "") +
-      '<span class="cal-chip-title">' + escapeHtml(t.title) + '</span></button>';
+      '<span class="cal-chip-title">' + (isPeriodDay ? "▸ " : "") + escapeHtml(t.title) + '</span></button>';
   }
   function calNavLabel() {
     var d = calRefDate();
@@ -1841,7 +1887,7 @@
       html += '<div class="cal-cell' + (inMonth ? "" : " out") + (dKey === todayStr ? " is-today" : "") + '" data-cal-add="' + dKey + '">' +
         '<span class="cal-daynum">' + d.getDate() + '</span>';
       var shown = items.slice(0, 3);
-      shown.forEach(function (t) { html += calChipHtml(t); });
+      shown.forEach(function (t) { html += calChipHtml(t, dKey); });
       if (items.length > shown.length) html += '<span class="cal-more">+' + (items.length - shown.length) + '件</span>';
       html += '</div>';
     }
@@ -1866,7 +1912,7 @@
       html += '<div class="cal-cell cal-cell-tall' + (dKey === todayStr ? " is-today" : "") + '" data-cal-add="' + dKey + '">' +
         '<span class="cal-daynum">' + (d.getMonth() + 1) + '/' + d.getDate() + '</span>';
       var shown = items.slice(0, 6);
-      shown.forEach(function (t) { html += calChipHtml(t); });
+      shown.forEach(function (t) { html += calChipHtml(t, dKey); });
       if (items.length > shown.length) html += '<span class="cal-more">+' + (items.length - shown.length) + '件</span>';
       html += '</div>';
     }
@@ -1884,7 +1930,7 @@
     }
     var meta = QUAD_META[quadrantOf(t)];
     return '<div class="ticket ticket-clickable status-' + t.status + '" data-cal-edit="' + t.id + '"><div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' +
-      '<span class="pill ' + meta.cls + '">' + meta.title + '</span>' + repeatPillHtml(t) + '</div>' +
+      '<span class="pill ' + meta.cls + '">' + meta.title + '</span>' + repeatPillHtml(t) + periodPillHtml(t) + '</div>' +
       '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
       (t.note ? '<p class="ticket-note">' + escapeHtml(t.note) + '</p>' : "") +
       '<div class="ticket-actions">' + (t.status !== "done" ? '<span class="pomo-dots" title="ポモドーロ進捗">' + pomoDots(t) + '</span>' : "") +
@@ -1972,7 +2018,7 @@
           var meta = QUAD_META[quadrantOf(t)];
           html += '<div class="ticket ticket-clickable status-' + t.status + '"' + (IS_TOUCH ? "" : ' draggable="true"') + ' data-drag="' + t.id + '" data-cal-edit="' + t.id + '">' +
             '<div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' +
-            '<span class="pill ' + meta.cls + '">' + meta.title + '</span>' + repeatPillHtml(t) + '</div>' +
+            '<span class="pill ' + meta.cls + '">' + meta.title + '</span>' + repeatPillHtml(t) + periodPillHtml(t) + '</div>' +
             '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
             (t.note ? '<p class="ticket-note">' + escapeHtml(t.note) + '</p>' : "") +
             '<div class="ticket-actions">' +
@@ -2053,7 +2099,7 @@
         var meta = QUAD_META[quadrantOf(t)];
         return '<div class="ticket ticket-clickable status-done" data-cal-edit="' + t.id + '">' +
           '<div class="ticket-head"><span class="ticket-no">' + t.no + '</span>' +
-          '<span class="pill ' + meta.cls + '">' + meta.title + '</span>' + repeatPillHtml(t) +
+          '<span class="pill ' + meta.cls + '">' + meta.title + '</span>' + repeatPillHtml(t) + periodPillHtml(t) +
           '<span class="spacer"></span><span class="done-week-date">' + formatCompletedDate(t.completedAt) + '</span></div>' +
           '<p class="ticket-title">' + escapeHtml(t.title) + '</p>' +
           (t.note ? '<p class="ticket-note">' + escapeHtml(t.note) + '</p>' : "") + '</div>';
@@ -2187,6 +2233,10 @@
       input.addEventListener("change", function () { setDueDate(Number(input.dataset.dueDate), input.value); });
       // blurまで再描画を待つ(iOSのネイティブ日付ピッカーが開いている間にinputごと
       // 作り直すと、ピッカーが強制的に閉じてしまうため)。
+      input.addEventListener("blur", function () { deferRender(); });
+    });
+    Array.prototype.forEach.call(main.querySelectorAll("[data-start-date]"), function (input) {
+      input.addEventListener("change", function () { setStartDate(Number(input.dataset.startDate), input.value); });
       input.addEventListener("blur", function () { deferRender(); });
     });
     function applyHourMin(id) {
@@ -2326,7 +2376,7 @@
     html += '<div class="modal-head"><div class="modal-title-group">' +
       '<div class="modal-eyebrow"><span>' + t.no + '</span>' +
       (t.triaged ? '<span class="pill ' + meta.cls + '">' + meta.title + '</span>' : '<span class="pill pill-muted">未仕分け</span>') +
-      repeatPillHtml(t) + '</div>' +
+      repeatPillHtml(t) + periodPillHtml(t) + '</div>' +
       '<input type="text" class="modal-title-input" id="modalTitleInput" value="' + escapeHtml(t.title) + '" placeholder="タイトル"></div>' +
       '<button type="button" class="modal-close" id="modalCloseBtn" aria-label="閉じる">×</button></div>';
 
@@ -2401,6 +2451,10 @@
       input.addEventListener("change", function () { setDueDate(Number(input.dataset.dueDate), input.value); });
       // blurまで再描画を待つ(iOSのネイティブ日付ピッカーが開いている間にinputごと
       // 作り直すと、ピッカーが強制的に閉じてしまうため)。
+      input.addEventListener("blur", function () { deferRenderModal(); });
+    });
+    Array.prototype.forEach.call(overlay.querySelectorAll("[data-start-date]"), function (input) {
+      input.addEventListener("change", function () { setStartDate(Number(input.dataset.startDate), input.value); });
       input.addEventListener("blur", function () { deferRenderModal(); });
     });
     function applyModalHourMin(hmId) {
@@ -2492,7 +2546,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202609171458").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202609171520").catch(function () {});
     });
   }
 </script>
