@@ -11,9 +11,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="タスクデスク">
-<link rel="manifest" href="manifest.json?v=202609171520">
-<link rel="icon" href="icon-192.png?v=202609171520">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609171520">
+<link rel="manifest" href="manifest.json?v=202609171827">
+<link rel="icon" href="icon-192.png?v=202609171827">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=202609171827">
 <style>
   :root {
     --ink: #1C2321;
@@ -1825,8 +1825,15 @@
     }
     // 各日の中では時刻順に並べる(時刻未設定は末尾)。state.tasksの並び(作成順)のままだと
     // カレンダー上でチケットが期限順になっていなかったため。
+    // ただし期間チケットが「期限当日ではない日」に出ている時は、実際の期限(先の日付)の
+    // 時刻でソートすると常に最後尾に埋もれてしまう。その日はまだ「継続中」なだけなので、
+    // その日の0時扱い(終日予定と同じ並び)にして、期限当日のチケットより前に出す。
     Object.keys(byDate).forEach(function (k) {
-      byDate[k].sort(function (a, b) { return dueDateTimeMs(a) - dueDateTimeMs(b); });
+      byDate[k].sort(function (a, b) {
+        var am = a.dueDate === k ? dueDateTimeMs(a) : new Date(k + "T00:00:00").getTime();
+        var bm = b.dueDate === k ? dueDateTimeMs(b) : new Date(k + "T00:00:00").getTime();
+        return am - bm;
+      });
     });
     return byDate;
   }
@@ -2546,7 +2553,7 @@
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("sw.js?v=202609171520").catch(function () {});
+      navigator.serviceWorker.register("sw.js?v=202609171827").catch(function () {});
     });
   }
 </script>
