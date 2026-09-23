@@ -1173,8 +1173,8 @@
     // (空欄の期限に今日の日付が一瞬入って即座に閉じる、という不具合として報告された)。
     // 呼び出し側(bindMainEvents/bindModalEvents)でblur時に描画するようにしている。
   }
-  // 「この日からこの日までにやる」という幅を持たせたい時の開始日。期限(終了日)は
-  // 必ず要る前提(開始日だけ設定して期限が無い、という状態は作らせない)。
+  // 「この日からこの日までにやる」という幅を持たせたい時の開始日。期限より前に
+  // 開始日だけ先に決めておくこともできる(カレンダー上には期限が入るまで表示されない)。
   function setStartDate(id, value) {
     var t = findTask(id); if (!t) return;
     var newDate = value || null;
@@ -1673,9 +1673,7 @@
   }
   function ticketDueHtml(t) {
     var html = '<span class="due-group' + (isOverdue(t) ? " overdue" : "") + '">';
-    if (t.dueDate) {
-      html += '<label class="due-field"><span>開始日</span><input type="date" data-start-date="' + t.id + '" value="' + (t.startDate || "") + '" max="' + t.dueDate + '"></label>';
-    }
+    html += '<label class="due-field"><span>開始日</span><input type="date" data-start-date="' + t.id + '" value="' + (t.startDate || "") + '"' + (t.dueDate ? ' max="' + t.dueDate + '"' : "") + '></label>';
     html += '<label class="due-field"><span>期限</span><input type="date" data-due-date="' + t.id + '" value="' + (t.dueDate || "") + '"' + (t.startDate ? ' min="' + t.startDate + '"' : "") + '></label>';
     if (t.dueDate) {
       var hh = t.dueTime ? t.dueTime.split(":")[0] : "";
