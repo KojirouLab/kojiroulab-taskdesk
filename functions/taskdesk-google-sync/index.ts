@@ -153,6 +153,12 @@ function fieldsFromEvent(ev: any): { title: string; note: string; dueDate: strin
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS_HEADERS });
+  // この実行中にGoogle側へ新規作成したイベント。結果をtaskdesk_stateへ書き込めなかった
+  // 場合(楽観ロックで見送り・途中で例外)は、タスク側にgoogleEventIdが残らないので、
+  // 放置すると次回の同期で「どのタスクにも紐付かない孤立イベント」として別チケットに
+  // 取り込まれ、同じチケットが2枚に増えてしまう(実際に起きた不具合)。その時は消して戻す。
+  const createdEventIds: string[] = [];
+  let rollbackCreated: () => Promise<void> = async () => {};
   try {
     const body = await req.json().catch(() => ({}));
     const syncId: string | undefined = body?.syncId;
@@ -188,6 +194,11 @@ Deno.serve(async (req) => {
 
     const accessToken = await refreshAccessToken(account.refresh_token);
     const calendarId = account.calendar_id;
+    rollbackCreated = async () => {
+      for (const id of createdEventIds) {
+        try { await gcal(accessToken, calendarId, 'DELETE', `/events/${id}`); } catch (err) { console.error(err); }
+      }
+    };
 
     // クライアント側でタスクごと削除された分は、まずGoogle側のイベントを消しておく。
     // ここより後でイベント一覧を取ると、消し忘れたイベントが「孤立イベント」として
@@ -232,6 +243,7 @@ Deno.serve(async (req) => {
           summary: t.title, description: t.note || '', start, end,
         });
         seenEventIds.add(created.id);
+        createdEventIds.push(created.id);
         nextTasks.push({ ...t, googleEventId: created.id, googleSyncedAt: now, touchedAt: t.touchedAt || now });
         continue;
       }
@@ -291,6 +303,7 @@ Deno.serve(async (req) => {
     const { data: updatedRows } = await writeQuery.select('id');
 
     if (!updatedRows || updatedRows.length === 0) {
+      await rollbackCreated();
       return new Response(JSON.stringify({ connected: true, skipped: 'local change landed during sync, will retry next cycle' }), {
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       });
@@ -301,6 +314,7 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     console.error(e);
+    await rollbackCreated();
     return new Response(JSON.stringify({ error: String(e) }), {
       status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     });
